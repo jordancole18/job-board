@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, MapPin, DollarSign, Upload, CheckCircle } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 
@@ -20,7 +20,6 @@ const AVATAR_COLORS = [
 
 export default function ApplyPage() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitted, setSubmitted] = useState(false);

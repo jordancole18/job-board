@@ -8,8 +8,6 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "deploy:app": "npx eas-cli@latest workflow:run create-production-builds.yml",
-    "deploy:functions": "npx supabase functions deploy estimate-food --no-verify-jwt",
     "migrate": "npx supabase db push"
   },
   "dependencies": {

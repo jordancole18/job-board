@@ -14,11 +14,6 @@ interface Job {
   created_at: string;
 }
 
-interface AppCount {
-  job_id: string;
-  count: number;
-}
-
 const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
   active: { bg: 'rgba(56,182,83,0.1)', text: '#2d9a46', label: 'Active' },
   inactive: { bg: 'rgba(107,114,128,0.1)', text: '#6b7280', label: 'Inactive' },
