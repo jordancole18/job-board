@@ -1,7 +1,6 @@
 export interface Employer {
   id: string;
   email: string;
-  password: string;
   companyName: string;
   isAdmin: boolean;
   createdAt: string;

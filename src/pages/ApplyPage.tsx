@@ -51,11 +51,24 @@ export default function ApplyPage() {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
+  const ALLOWED_TYPES = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  ];
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+
   async function uploadFile(file: File, folder: string): Promise<{ path: string | null; error: string | null }> {
-    const ext = file.name.split('.').pop();
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      return { path: null, error: 'Only PDF, DOC, and DOCX files are allowed.' };
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      return { path: null, error: 'File must be under 5 MB.' };
+    }
+    const ext = file.name.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'pdf';
     const filePath = `${folder}/${crypto.randomUUID()}.${ext}`;
     const { error } = await supabase.storage.from('applications').upload(filePath, file);
-    if (error) return { path: null, error: error.message };
+    if (error) return { path: null, error: 'Upload failed. Please try again.' };
     return { path: filePath, error: null };
   }
 
@@ -99,7 +112,8 @@ export default function ApplyPage() {
     });
 
     if (insertError) {
-      setError(insertError.message);
+      console.error('Application insert error:', insertError.message);
+      setError('Something went wrong. Please try again.');
       setSubmitting(false);
       return;
     }

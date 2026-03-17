@@ -26,13 +26,31 @@ export default function SubmitResumePage() {
     setError('');
     setSubmitting(true);
 
+    const ALLOWED_TYPES = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ];
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+
     let resumePath: string | null = null;
     if (resumeFile) {
-      const ext = resumeFile.name.split('.').pop();
+      if (!ALLOWED_TYPES.includes(resumeFile.type)) {
+        setError('Only PDF, DOC, and DOCX files are allowed.');
+        setSubmitting(false);
+        return;
+      }
+      if (resumeFile.size > MAX_FILE_SIZE) {
+        setError('File must be under 5 MB.');
+        setSubmitting(false);
+        return;
+      }
+      const ext = resumeFile.name.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'pdf';
       const filePath = `general-submissions/${crypto.randomUUID()}.${ext}`;
       const { error: uploadError } = await supabase.storage.from('applications').upload(filePath, resumeFile);
       if (uploadError) {
-        setError(`Resume upload failed: ${uploadError.message}`);
+        console.error('Resume upload error:', uploadError.message);
+        setError('Resume upload failed. Please try again.');
         setSubmitting(false);
         return;
       }
@@ -50,7 +68,8 @@ export default function SubmitResumePage() {
     });
 
     if (insertError) {
-      setError(insertError.message);
+      console.error('Submission insert error:', insertError.message);
+      setError('Something went wrong. Please try again.');
       setSubmitting(false);
       return;
     }
