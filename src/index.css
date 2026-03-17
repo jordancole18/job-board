@@ -445,15 +445,15 @@ select.input { cursor: pointer; appearance: auto; }
   gap: 6px;
   background: none;
   border: none;
-  color: var(--surface);
-  opacity: 0.85;
+  color: var(--text-secondary);
   font-size: 0.88rem;
+  font-weight: 500;
   font-family: var(--font-body);
   cursor: pointer;
-  transition: opacity var(--duration) var(--ease);
+  transition: color var(--duration) var(--ease);
 }
 .hero-advanced-link:hover {
-  opacity: 1;
+  color: var(--primary);
   text-decoration: underline;
 }
 
