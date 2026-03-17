@@ -52,7 +52,9 @@ export default function JobDetailPage() {
       setJob(data as Job | null);
       setLoading(false);
       if (data) {
-        supabase.from('job_views').insert({ job_id: data.id });
+        supabase.from('job_views').insert({ job_id: data.id }).then(({ error }) => {
+          if (error) console.error('Failed to record view:', error.message);
+        });
       }
     }
     load();
