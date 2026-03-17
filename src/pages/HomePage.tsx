@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Search, MapPin, Briefcase, Tag } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, MapPin, Briefcase, Tag, SlidersHorizontal } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import JobCard from '../components/JobCard';
 
@@ -30,6 +31,7 @@ interface TagOption {
 }
 
 export default function HomePage() {
+  const navigate = useNavigate();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [tags, setTags] = useState<TagOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -149,8 +151,22 @@ export default function HomePage() {
                 ))}
               </select>
             </div>
-            <button className="btn btn-primary hero-search-btn" onClick={() => {}}>
+            <button
+              className="btn btn-primary hero-search-btn"
+              onClick={() => {
+                const params = new URLSearchParams();
+                if (search) params.set('q', search);
+                if (locationFilter) params.set('location', locationFilter);
+                if (typeFilter) params.set('type', typeFilter);
+                navigate(`/map${params.toString() ? `?${params}` : ''}`);
+              }}
+            >
               Search
+            </button>
+          </div>
+          <div className="hero-search-footer">
+            <button className="hero-advanced-link" onClick={() => navigate('/map')}>
+              <SlidersHorizontal size={14} /> Advanced Search
             </button>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Briefcase, Shield } from 'lucide-react';
+import { Briefcase, Shield, SlidersHorizontal } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Navbar() {
@@ -26,7 +26,7 @@ export default function Navbar() {
             Jobs
           </Link>
           <Link to="/map" className={`nav-link ${pathname === '/map' ? 'nav-link-active' : ''}`}>
-            Map
+            <SlidersHorizontal size={14} /> Advanced Search
           </Link>
           <Link to="/submit-resume" className={`nav-link ${pathname === '/submit-resume' ? 'nav-link-active' : ''}`}>
             Submit Resume

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Search, MapPin, DollarSign } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import { haversineDistance, radiusToZoom } from '../utils/distance';
@@ -42,10 +42,11 @@ const RADIUS_OPTIONS = [
 const US_CENTER: [number, number] = [39.8283, -98.5795];
 
 export default function MapPage() {
+  const [searchParams] = useSearchParams();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
-  const [keyword, setKeyword] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
+  const [keyword, setKeyword] = useState(searchParams.get('q') || '');
+  const [typeFilter, setTypeFilter] = useState(searchParams.get('type') || '');
   const [radius, setRadius] = useState(0);
   const [locationCenter, setLocationCenter] = useState<[number, number] | null>(null);
   const [locationLabel, setLocationLabel] = useState('');
@@ -62,6 +63,29 @@ export default function MapPage() {
       setLoading(false);
     }
     load();
+
+    // Auto-geocode location from URL params
+    const locationParam = searchParams.get('location');
+    if (locationParam) {
+      fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationParam)}&countrycodes=us&limit=1`,
+        { headers: { 'User-Agent': 'JobBoardMVP/1.0' } }
+      )
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.length > 0) {
+            const lat = parseFloat(data[0].lat);
+            const lng = parseFloat(data[0].lon);
+            const parts = data[0].display_name.split(',');
+            const label = parts.slice(0, 2).map((p: string) => p.trim()).join(', ');
+            setLocationCenter([lat, lng]);
+            setLocationLabel(label);
+            setMapCenter([lat, lng]);
+            setMapZoom(10);
+          }
+        })
+        .catch(() => {});
+    }
   }, []);
 
   function handleLocationSelect(lat: number, lng: number, label: string) {

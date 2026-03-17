@@ -363,7 +363,7 @@ select.input { cursor: pointer; appearance: auto; }
 }
 
 .hero-search {
-  max-width: 760px;
+  max-width: 880px;
   margin: 32px auto 0;
 }
 
@@ -426,6 +426,29 @@ select.input { cursor: pointer; appearance: auto; }
   padding: 12px 28px !important;
   flex-shrink: 0;
   font-size: 0.92rem !important;
+}
+
+.hero-search-footer {
+  text-align: center;
+  margin-top: 14px;
+}
+
+.hero-advanced-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--surface);
+  opacity: 0.85;
+  font-size: 0.88rem;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: opacity var(--duration) var(--ease);
+}
+.hero-advanced-link:hover {
+  opacity: 1;
+  text-decoration: underline;
 }
 
 /* ===== Filters ===== */
