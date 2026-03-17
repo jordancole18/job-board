@@ -164,7 +164,7 @@ export default function HomePage() {
               Search
             </button>
           </div>
-          <div className="hero-search-footer">
+          <div className="hero-search-actions">
             <button className="hero-advanced-link" onClick={() => navigate('/map')}>
               <SlidersHorizontal size={14} /> Advanced Search
             </button>

@@ -379,13 +379,17 @@ select.input { cursor: pointer; appearance: auto; }
 }
 
 .hero-search-field {
-  flex: 1;
+  flex: 1.5;
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px 16px;
   min-width: 0;
   border-right: 1px solid var(--border-light);
+}
+
+.hero-search-field:nth-child(n+3) {
+  flex: 1;
 }
 
 .hero-search-field:last-of-type {
@@ -428,9 +432,11 @@ select.input { cursor: pointer; appearance: auto; }
   font-size: 0.92rem !important;
 }
 
-.hero-search-footer {
-  text-align: center;
-  margin-top: 14px;
+.hero-search-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+  padding-right: 4px;
 }
 
 .hero-advanced-link {
