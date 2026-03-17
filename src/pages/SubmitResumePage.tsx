@@ -104,9 +104,9 @@ export default function SubmitResumePage() {
         <div className="submit-resume-icon">
           <FileText size={32} />
         </div>
-        <h1>Submit Your Resume</h1>
+        <h1>Become a Candidate</h1>
         <p>
-          Don't see a position that fits? Submit your resume and we'll keep it on file.
+          Don't see a position that fits? Submit your information and we'll keep it on file.
           If a matching opportunity opens up, we'll reach out to you directly.
         </p>
         <p className="submit-resume-confidential">
@@ -222,7 +222,7 @@ export default function SubmitResumePage() {
           {error && <p className="error-text">{error}</p>}
 
           <button type="submit" className="btn btn-primary btn-full btn-lg" disabled={submitting}>
-            {submitting ? 'Submitting...' : 'Submit Resume'}
+            {submitting ? 'Submitting...' : 'Submit'}
           </button>
         </form>
       </div>

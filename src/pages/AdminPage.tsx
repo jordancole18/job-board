@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Tag, FileText, Star, Plus, Trash2, Download, Eye } from 'lucide-react';
+import { Tag, FileText, Star, Plus, Trash2, Download, Eye, Pencil, Check, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabase';
 
@@ -46,6 +46,8 @@ export default function AdminPage() {
   const [tags, setTags] = useState<TagItem[]>([]);
   const [newTagName, setNewTagName] = useState('');
   const [newTagColor, setNewTagColor] = useState('#6366f1');
+  const [editingTagId, setEditingTagId] = useState<string | null>(null);
+  const [editingTagName, setEditingTagName] = useState('');
 
   // Submissions state
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -105,6 +107,17 @@ export default function AdminPage() {
     if (!confirm('Delete this category? It will be removed from all jobs.')) return;
     await supabase.from('tags').delete().eq('id', id);
     setTags((prev) => prev.filter((t) => t.id !== id));
+  }
+
+  async function updateTagName(id: string) {
+    const trimmed = editingTagName.trim();
+    if (!trimmed) return;
+    const { error } = await supabase.from('tags').update({ name: trimmed }).eq('id', id);
+    if (!error) {
+      setTags((prev) => prev.map((t) => t.id === id ? { ...t, name: trimmed } : t).sort((a, b) => a.name.localeCompare(b.name)));
+    }
+    setEditingTagId(null);
+    setEditingTagName('');
   }
 
   async function toggleFeatured(jobId: string, current: boolean) {
@@ -181,11 +194,42 @@ export default function AdminPage() {
               <div key={tag.id} className="admin-tag-item">
                 <div className="admin-tag-info">
                   <span className="admin-tag-dot" style={{ backgroundColor: tag.color }} />
-                  <span>{tag.name}</span>
+                  {editingTagId === tag.id ? (
+                    <input
+                      className="input admin-tag-edit-input"
+                      value={editingTagName}
+                      onChange={(e) => setEditingTagName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') updateTagName(tag.id);
+                        if (e.key === 'Escape') { setEditingTagId(null); setEditingTagName(''); }
+                      }}
+                      autoFocus
+                    />
+                  ) : (
+                    <span>{tag.name}</span>
+                  )}
                 </div>
-                <button className="btn-icon btn-icon-danger" onClick={() => deleteTag(tag.id)}>
-                  <Trash2 size={16} />
-                </button>
+                <div className="admin-tag-actions">
+                  {editingTagId === tag.id ? (
+                    <>
+                      <button className="btn-icon" onClick={() => updateTagName(tag.id)} title="Save">
+                        <Check size={16} />
+                      </button>
+                      <button className="btn-icon" onClick={() => { setEditingTagId(null); setEditingTagName(''); }} title="Cancel">
+                        <X size={16} />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button className="btn-icon" onClick={() => { setEditingTagId(tag.id); setEditingTagName(tag.name); }} title="Rename">
+                        <Pencil size={16} />
+                      </button>
+                      <button className="btn-icon btn-icon-danger" onClick={() => deleteTag(tag.id)} title="Delete">
+                        <Trash2 size={16} />
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             ))}
             {tags.length === 0 && (

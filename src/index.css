@@ -1,5 +1,5 @@
 /* ================================================
-   AEJobs — Premium Design System
+   Association Careers — Premium Design System
    ================================================ */
 
 /* ===== Reset ===== */
@@ -2894,6 +2894,21 @@ select.input { cursor: pointer; appearance: auto; }
   gap: var(--space-sm);
   font-size: 0.9rem;
   font-weight: 500;
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-tag-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.admin-tag-edit-input {
+  padding: 4px 8px !important;
+  font-size: 0.9rem !important;
+  height: auto !important;
 }
 
 .admin-tag-dot {
