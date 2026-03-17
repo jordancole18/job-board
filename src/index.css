@@ -2992,6 +2992,90 @@ select.input { cursor: pointer; appearance: auto; }
   color: var(--text-muted);
 }
 
+/* ===== Employer Approval ===== */
+.admin-employers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.admin-employer-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px var(--space-md);
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  gap: var(--space-md);
+}
+
+.admin-employer-pending {
+  border-color: rgba(249, 115, 22, 0.3);
+  background: rgba(249, 115, 22, 0.03);
+}
+
+.admin-employer-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.admin-employer-info strong {
+  font-size: 0.92rem;
+}
+
+.admin-employer-actions {
+  flex-shrink: 0;
+}
+
+.pending-approval-card {
+  text-align: center;
+  padding: var(--space-2xl) var(--space-xl);
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  max-width: 480px;
+  margin: var(--space-xl) auto;
+}
+
+.pending-approval-icon {
+  color: var(--accent-warm);
+  margin-bottom: var(--space-md);
+}
+
+.pending-approval-card h2 {
+  margin-bottom: var(--space-sm);
+}
+
+.pending-approval-card p {
+  color: var(--text-secondary);
+  margin-bottom: var(--space-lg);
+}
+
+.pending-approval-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: rgba(249, 115, 22, 0.08);
+  border: 1px solid rgba(249, 115, 22, 0.2);
+  border-radius: var(--radius);
+  margin-bottom: var(--space-lg);
+  color: #ea580c;
+  font-size: 0.88rem;
+}
+
+.pending-approval-banner p {
+  margin: 0;
+}
+
+.btn-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 /* ===== Job Detail Tags ===== */
 .job-detail-tags {
   display: flex;

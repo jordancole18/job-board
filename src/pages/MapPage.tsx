@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Search, MapPin, DollarSign } from 'lucide-react';
+import { Search, MapPin, DollarSign, Tag } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import { haversineDistance, radiusToZoom } from '../utils/distance';
 import MapView from '../components/MapView';
 import LocationAutocomplete from '../components/LocationAutocomplete';
+
+interface JobTag {
+  tag_id: string;
+}
 
 interface Job {
   id: string;
@@ -16,6 +20,12 @@ interface Job {
   job_type: string;
   lat: number;
   lng: number;
+  job_tags: JobTag[];
+}
+
+interface TagOption {
+  id: string;
+  name: string;
 }
 
 const AVATAR_COLORS = [
@@ -45,8 +55,10 @@ export default function MapPage() {
   const [searchParams] = useSearchParams();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tags, setTags] = useState<TagOption[]>([]);
   const [keyword, setKeyword] = useState(searchParams.get('q') || '');
   const [typeFilter, setTypeFilter] = useState(searchParams.get('type') || '');
+  const [tagFilter, setTagFilter] = useState(searchParams.get('tag') || '');
   const [radius, setRadius] = useState(0);
   const [locationCenter, setLocationCenter] = useState<[number, number] | null>(null);
   const [locationLabel, setLocationLabel] = useState('');
@@ -56,10 +68,12 @@ export default function MapPage() {
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase
-        .from('jobs')
-        .select('id, title, company_name, city, state, salary, job_type, lat, lng');
-      if (data) setJobs(data);
+      const [jobsRes, tagsRes] = await Promise.all([
+        supabase.from('jobs').select('id, title, company_name, city, state, salary, job_type, lat, lng, job_tags(tag_id)').eq('status', 'active'),
+        supabase.from('tags').select('id, name').order('name'),
+      ]);
+      if (jobsRes.data) setJobs(jobsRes.data as Job[]);
+      if (tagsRes.data) setTags(tagsRes.data);
       setLoading(false);
     }
     load();
@@ -116,11 +130,12 @@ export default function MapPage() {
       job.title.toLowerCase().includes(keyword.toLowerCase()) ||
       job.company_name.toLowerCase().includes(keyword.toLowerCase());
     const matchesType = !typeFilter || job.job_type === typeFilter;
+    const matchesTag = !tagFilter || job.job_tags?.some((jt) => jt.tag_id === tagFilter);
     const matchesRadius =
       !locationCenter ||
       radius === 0 ||
       haversineDistance(locationCenter[0], locationCenter[1], job.lat, job.lng) <= radius;
-    return matchesKeyword && matchesType && matchesRadius;
+    return matchesKeyword && matchesType && matchesTag && matchesRadius;
   });
 
   return (
@@ -166,6 +181,9 @@ export default function MapPage() {
                 className="explore-search-input"
               />
             </div>
+          </div>
+
+          <div className="explore-keyword-row">
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
@@ -176,6 +194,16 @@ export default function MapPage() {
               <option value="part-time">Part-Time</option>
               <option value="contract">Contract</option>
               <option value="remote">Remote</option>
+            </select>
+            <select
+              value={tagFilter}
+              onChange={(e) => setTagFilter(e.target.value)}
+              className="input explore-type-select"
+            >
+              <option value="">All Categories</option>
+              {tags.map((t) => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
             </select>
           </div>
         </div>

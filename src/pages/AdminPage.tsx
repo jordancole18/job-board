@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Tag, FileText, Star, Plus, Trash2, Download, Eye, Pencil, Check, X } from 'lucide-react';
+import { Tag, FileText, Star, Plus, Trash2, Download, Eye, Pencil, Check, X, Users, ShieldCheck, ShieldX } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabase';
 
@@ -32,6 +32,15 @@ interface FeaturedJob {
   status: string;
 }
 
+interface Employer {
+  id: string;
+  user_id: string;
+  company_name: string;
+  is_admin: boolean;
+  is_approved: boolean;
+  created_at: string;
+}
+
 const AVATAR_COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316',
   '#eab308', '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6',
@@ -40,7 +49,7 @@ const AVATAR_COLORS = [
 export default function AdminPage() {
   const { user, isAdmin, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'tags' | 'submissions' | 'featured'>('tags');
+  const [activeTab, setActiveTab] = useState<'tags' | 'submissions' | 'featured' | 'employers'>('employers');
 
   // Tags state
   const [tags, setTags] = useState<TagItem[]>([]);
@@ -57,6 +66,9 @@ export default function AdminPage() {
   // Featured jobs state
   const [allJobs, setAllJobs] = useState<FeaturedJob[]>([]);
 
+  // Employers state
+  const [employers, setEmployers] = useState<Employer[]>([]);
+
   useEffect(() => {
     if (authLoading) return;
     if (!user || !isAdmin) {
@@ -66,6 +78,7 @@ export default function AdminPage() {
     loadTags();
     loadSubmissions();
     loadJobs();
+    loadEmployers();
   }, [user, isAdmin, authLoading]);
 
   async function loadTags() {
@@ -88,6 +101,19 @@ export default function AdminPage() {
       .select('id, title, company_name, city, state, is_featured, status')
       .order('created_at', { ascending: false });
     if (data) setAllJobs(data);
+  }
+
+  async function loadEmployers() {
+    const { data } = await supabase
+      .from('employers')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (data) setEmployers(data);
+  }
+
+  async function toggleApproval(employerId: string, currentlyApproved: boolean) {
+    await supabase.from('employers').update({ is_approved: !currentlyApproved }).eq('id', employerId);
+    setEmployers((prev) => prev.map((e) => e.id === employerId ? { ...e, is_approved: !currentlyApproved } : e));
   }
 
   async function addTag() {
@@ -147,6 +173,15 @@ export default function AdminPage() {
 
       <div className="dashboard-tabs">
         <button
+          className={`dashboard-tab ${activeTab === 'employers' ? 'dashboard-tab-active' : ''}`}
+          onClick={() => setActiveTab('employers')}
+        >
+          <Users size={16} /> Employers
+          {employers.filter((e) => !e.is_approved && !e.is_admin).length > 0 && (
+            <span className="tab-badge">{employers.filter((e) => !e.is_approved && !e.is_admin).length}</span>
+          )}
+        </button>
+        <button
           className={`dashboard-tab ${activeTab === 'tags' ? 'dashboard-tab-active' : ''}`}
           onClick={() => setActiveTab('tags')}
         >
@@ -166,6 +201,57 @@ export default function AdminPage() {
           <Star size={16} /> Featured Jobs
         </button>
       </div>
+
+      {/* Employers Management */}
+      {activeTab === 'employers' && (
+        <div className="admin-section">
+          {employers.length === 0 ? (
+            <div className="empty-state">
+              <h3>No employer accounts yet</h3>
+            </div>
+          ) : (
+            <div className="admin-employers-list">
+              {employers.map((emp) => {
+                const color = AVATAR_COLORS[emp.company_name.charCodeAt(0) % AVATAR_COLORS.length];
+                return (
+                  <div key={emp.id} className={`admin-employer-item ${!emp.is_approved ? 'admin-employer-pending' : ''}`}>
+                    <div className="admin-employer-info">
+                      <div className="ej-app-avatar" style={{ backgroundColor: color }}>
+                        {emp.company_name.charAt(0)}
+                      </div>
+                      <div>
+                        <strong>{emp.company_name}</strong>
+                        <span className="ej-app-email">
+                          Joined {new Date(emp.created_at).toLocaleDateString()}
+                          {emp.is_admin && ' · Admin'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="admin-employer-actions">
+                      {emp.is_admin ? (
+                        <span className="status-badge" style={{ backgroundColor: 'rgba(56,182,83,0.1)', color: '#2d9a46' }}>
+                          Admin
+                        </span>
+                      ) : (
+                        <button
+                          className={`btn btn-sm ${emp.is_approved ? 'btn-outline' : 'btn-primary'}`}
+                          onClick={() => toggleApproval(emp.id, emp.is_approved)}
+                        >
+                          {emp.is_approved ? (
+                            <><ShieldX size={14} /> Revoke</>
+                          ) : (
+                            <><ShieldCheck size={14} /> Approve</>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Tags Management */}
       {activeTab === 'tags' && (

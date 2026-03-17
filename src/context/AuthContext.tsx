@@ -7,6 +7,7 @@ interface AuthState {
   user: User | null;
   companyName: string | null;
   isAdmin: boolean;
+  isApproved: boolean;
   loading: boolean;
   signUp: (email: string, password: string, companyName: string) => Promise<string | null>;
   signIn: (email: string, password: string) => Promise<string | null>;
@@ -20,6 +21,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [companyName, setCompanyName] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isApproved, setIsApproved] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -44,12 +46,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             .insert({ user_id: session.user.id, company_name: pendingCompany });
           setCompanyName(pendingCompany);
           setIsAdmin(false);
+          setIsApproved(false);
         } else {
           fetchEmployerInfo(session.user.id);
         }
       } else {
         setCompanyName(null);
         setIsAdmin(false);
+        setIsApproved(false);
       }
     });
 
@@ -59,11 +63,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function fetchEmployerInfo(userId: string) {
     const { data } = await supabase
       .from('employers')
-      .select('company_name, is_admin')
+      .select('company_name, is_admin, is_approved')
       .eq('user_id', userId)
       .single();
     setCompanyName(data?.company_name ?? null);
     setIsAdmin(data?.is_admin ?? false);
+    setIsApproved(data?.is_approved ?? false);
   }
 
   async function signUp(email: string, password: string, company: string): Promise<string | null> {
@@ -91,10 +96,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
     setCompanyName(null);
     setIsAdmin(false);
+    setIsApproved(false);
   }
 
   return (
-    <AuthContext.Provider value={{ session, user, companyName, isAdmin, loading, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ session, user, companyName, isAdmin, isApproved, loading, signUp, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

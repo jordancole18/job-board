@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Briefcase, Users, Eye, ChevronRight, CreditCard } from 'lucide-react';
+import { Briefcase, Users, Eye, ChevronRight, CreditCard, Clock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabase';
 
@@ -21,7 +21,7 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }>
 };
 
 export default function DashboardPage() {
-  const { user, companyName, loading: authLoading } = useAuth();
+  const { user, companyName, isApproved, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [appCounts, setAppCounts] = useState<Record<string, number>>({});
@@ -94,8 +94,21 @@ export default function DashboardPage() {
             <p className="dashboard-company">{companyName}</p>
           </div>
         </div>
-        <Link to="/post-job" className="btn btn-primary">+ Post New Job</Link>
+        {isApproved ? (
+          <Link to="/post-job" className="btn btn-primary">+ Post New Job</Link>
+        ) : (
+          <span className="btn btn-outline btn-disabled" title="Pending admin approval">
+            <Clock size={14} /> Pending Approval
+          </span>
+        )}
       </div>
+
+      {!isApproved && (
+        <div className="pending-approval-banner">
+          <Clock size={18} />
+          <p>Your account is pending admin approval. Once approved, you'll be able to post jobs.</p>
+        </div>
+      )}
 
       <div className="dashboard-stats">
         <div className="stat-card">
@@ -144,8 +157,8 @@ export default function DashboardPage() {
           ) : jobs.length === 0 ? (
             <div className="empty-state">
               <h3>No job postings yet</h3>
-              <p>Create your first job posting to start receiving applications.</p>
-              <Link to="/post-job" className="btn btn-primary">Post a Job</Link>
+              <p>{isApproved ? 'Create your first job posting to start receiving applications.' : 'Your account is pending approval. You\'ll be able to post once approved.'}</p>
+              {isApproved && <Link to="/post-job" className="btn btn-primary">Post a Job</Link>}
             </div>
           ) : (
             <div className="dashboard-jobs">

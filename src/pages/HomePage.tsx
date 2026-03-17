@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, MapPin, Briefcase, Tag, SlidersHorizontal } from 'lucide-react';
+import { Search, MapPin, Briefcase, Tag, Map } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import JobCard from '../components/JobCard';
 
@@ -166,7 +166,7 @@ export default function HomePage() {
           </div>
           <div className="hero-search-actions">
             <button className="hero-advanced-link" onClick={() => navigate('/map')}>
-              <SlidersHorizontal size={14} /> Advanced Search
+              <Map size={14} /> Search By Map
             </button>
           </div>
         </div>
@@ -180,8 +180,8 @@ export default function HomePage() {
           {tags.map((tag) => (
             <div
               key={tag.id}
-              className={`category-card ${tagFilter === tag.id ? 'category-card-active' : ''}`}
-              onClick={() => setTagFilter(tagFilter === tag.id ? '' : tag.id)}
+              className="category-card"
+              onClick={() => navigate(`/map?tag=${tag.id}`)}
             >
               <div className="category-icon" style={{ backgroundColor: tag.color + '18', color: tag.color }}>
                 <Briefcase size={22} />

@@ -3,7 +3,7 @@ import { Briefcase, Shield } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Navbar() {
-  const { user, companyName, isAdmin, signOut } = useAuth();
+  const { user, companyName, isAdmin, isApproved, signOut } = useAuth();
   const { pathname } = useLocation();
 
   return (
@@ -38,9 +38,11 @@ export default function Navbar() {
                   <Shield size={14} /> Admin
                 </Link>
               )}
-              <Link to="/post-job" className="btn btn-primary btn-sm">
-                + Post Job
-              </Link>
+              {isApproved && (
+                <Link to="/post-job" className="btn btn-primary btn-sm">
+                  + Post Job
+                </Link>
+              )}
               <div className="navbar-user">
                 <span className="navbar-avatar">{companyName?.charAt(0)}</span>
                 <span className="navbar-company">{companyName}</span>

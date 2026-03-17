@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Clock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabase';
 import { geocodeAddress, normalizeState } from '../utils/geocode';
@@ -12,7 +12,7 @@ interface TagOption {
 }
 
 export default function PostJobPage() {
-  const { user, companyName, loading: authLoading } = useAuth();
+  const { user, companyName, isApproved, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -95,6 +95,24 @@ export default function PostJobPage() {
   }
 
   if (authLoading || !user) return <div className="page"><div className="loading">Loading...</div></div>;
+
+  if (!isApproved) {
+    return (
+      <div className="page">
+        <div className="page-header">
+          <Link to="/dashboard" className="back-link">
+            <ArrowLeft size={16} /> Back to Dashboard
+          </Link>
+        </div>
+        <div className="pending-approval-card">
+          <div className="pending-approval-icon"><Clock size={40} /></div>
+          <h2>Account Pending Approval</h2>
+          <p>Your employer account is awaiting admin approval. Once approved, you'll be able to create job postings.</p>
+          <Link to="/dashboard" className="btn btn-outline">Back to Dashboard</Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page">
