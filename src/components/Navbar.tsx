@@ -15,7 +15,7 @@ export default function Navbar() {
               <rect width="28" height="28" rx="8" fill="#38b653" />
               <Briefcase x="5" y="5" width="18" height="18" color="white" strokeWidth={1.5} />
             </svg>
-            JobBoard
+            AEJobs
           </Link>
           <span className="navbar-powered-by">
             powered by <strong>Paramount Consulting Group</strong>
