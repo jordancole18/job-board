@@ -17,6 +17,7 @@ interface Submission {
   email: string;
   phone: string | null;
   looking_for: string | null;
+  timeline: string | null;
   preferred_location: string | null;
   resume_url: string | null;
   created_at: string;
@@ -150,6 +151,16 @@ export default function AdminPage() {
     await supabase.from('jobs').update({ is_featured: !current }).eq('id', jobId);
     setAllJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, is_featured: !current } : j));
   }
+
+  async function deleteJob(jobId: string) {
+    if (!confirm('Delete this job posting? All applications and views will also be removed.')) return;
+    await supabase.from('job_tags').delete().eq('job_id', jobId);
+    await supabase.from('applications').delete().eq('job_id', jobId);
+    await supabase.from('job_views').delete().eq('job_id', jobId);
+    await supabase.from('jobs').delete().eq('id', jobId);
+    setAllJobs((prev) => prev.filter((j) => j.id !== jobId));
+  }
+
 
   async function downloadFile(storagePath: string) {
     const { data, error } = await supabase.storage
@@ -355,6 +366,7 @@ export default function AdminPage() {
 
                     {sub.phone && <p className="ej-app-detail"><strong>Phone:</strong> {sub.phone}</p>}
                     {sub.looking_for && <p className="ej-app-detail"><strong>Looking for:</strong> {sub.looking_for}</p>}
+                    {sub.timeline && <p className="ej-app-detail"><strong>Timeline:</strong> {sub.timeline}</p>}
                     {sub.preferred_location && <p className="ej-app-detail"><strong>Preferred location:</strong> {sub.preferred_location}</p>}
 
                     <div className="ej-app-files">
@@ -377,6 +389,7 @@ export default function AdminPage() {
                         <div className="billing-detail-row"><span>Email</span><strong>{sub.email}</strong></div>
                         {sub.phone && <div className="billing-detail-row"><span>Phone</span><strong>{sub.phone}</strong></div>}
                         {sub.looking_for && <div className="billing-detail-row"><span>Looking For</span><strong>{sub.looking_for}</strong></div>}
+                        {sub.timeline && <div className="billing-detail-row"><span>Timeline</span><strong>{sub.timeline}</strong></div>}
                         {sub.preferred_location && <div className="billing-detail-row"><span>Location</span><strong>{sub.preferred_location}</strong></div>}
                         <div className="billing-detail-row"><span>Submitted</span><strong>{new Date(sub.created_at).toLocaleString()}</strong></div>
                       </div>
@@ -415,6 +428,12 @@ export default function AdminPage() {
                       onClick={() => toggleFeatured(job.id, job.is_featured)}
                     >
                       <Star size={14} /> {job.is_featured ? 'Featured' : 'Make Featured'}
+                    </button>
+                    <button
+                      className="btn btn-sm btn-danger"
+                      onClick={() => deleteJob(job.id)}
+                    >
+                      <Trash2 size={14} /> Delete
                     </button>
                   </div>
                 </div>

@@ -14,6 +14,7 @@ export default function SubmitResumePage() {
     email: '',
     phone: '',
     lookingFor: '',
+    timeline: '',
     preferredLocation: '',
   });
 
@@ -62,8 +63,9 @@ export default function SubmitResumePage() {
       last_name: form.lastName,
       email: form.email,
       phone: form.phone || null,
-      looking_for: form.lookingFor || null,
-      preferred_location: form.preferredLocation || null,
+      looking_for: form.lookingFor,
+      timeline: form.timeline || null,
+      preferred_location: form.preferredLocation,
       resume_url: resumePath,
     });
 
@@ -167,6 +169,7 @@ export default function SubmitResumePage() {
             <label>What type of role are you looking for?</label>
             <textarea
               className="input textarea"
+              required
               value={form.lookingFor}
               onChange={(e) => update('lookingFor', e.target.value)}
               placeholder="e.g. Government Affairs Director, looking to advance from a small association to a larger one..."
@@ -174,14 +177,32 @@ export default function SubmitResumePage() {
             />
           </div>
 
-          <div className="form-group">
-            <label>Preferred Location (optional)</label>
-            <input
-              className="input"
-              value={form.preferredLocation}
-              onChange={(e) => update('preferredLocation', e.target.value)}
-              placeholder="e.g. Anywhere in the US, West Coast, Atlanta, GA..."
-            />
+          <div className="form-row">
+            <div className="form-group">
+              <label>When are you looking to make a change?</label>
+              <select
+                className="input"
+                value={form.timeline}
+                onChange={(e) => update('timeline', e.target.value)}
+              >
+                <option value="">Select a timeframe...</option>
+                <option value="Immediately">Immediately</option>
+                <option value="Within 1-3 months">Within 1-3 months</option>
+                <option value="Within 3-6 months">Within 3-6 months</option>
+                <option value="Within 6-12 months">Within 6-12 months</option>
+                <option value="Just exploring">Just exploring</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Preferred Location</label>
+              <input
+                className="input"
+                required
+                value={form.preferredLocation}
+                onChange={(e) => update('preferredLocation', e.target.value)}
+                placeholder="e.g. Anywhere in the US, West Coast, Atlanta, GA..."
+              />
+            </div>
           </div>
 
           <div className="form-group">

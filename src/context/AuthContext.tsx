@@ -25,11 +25,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchEmployerInfo(session.user.id);
+        await fetchEmployerInfo(session.user.id);
       }
       setLoading(false);
     });
@@ -48,7 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setIsAdmin(false);
           setIsApproved(false);
         } else {
-          fetchEmployerInfo(session.user.id);
+          await fetchEmployerInfo(session.user.id);
         }
       } else {
         setCompanyName(null);
@@ -61,14 +61,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function fetchEmployerInfo(userId: string) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('employers')
-      .select('company_name, is_admin, is_approved')
+      .select('*')
       .eq('user_id', userId)
       .single();
-    setCompanyName(data?.company_name ?? null);
-    setIsAdmin(data?.is_admin ?? false);
-    setIsApproved(data?.is_approved ?? false);
+
+    if (error) {
+      console.error('Failed to fetch employer info:', error.message, error.code);
+    }
+
+    if (data) {
+      setCompanyName(data.company_name ?? null);
+      setIsAdmin(data.is_admin ?? false);
+      setIsApproved(data.is_approved ?? false);
+    }
   }
 
   async function signUp(email: string, password: string, company: string): Promise<string | null> {

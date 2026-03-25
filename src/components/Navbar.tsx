@@ -43,10 +43,12 @@ export default function Navbar() {
                   + Post Job
                 </Link>
               )}
-              <div className="navbar-user">
-                <span className="navbar-avatar">{companyName?.charAt(0)}</span>
-                <span className="navbar-company">{companyName}</span>
-              </div>
+              {companyName && (
+                <div className="navbar-user">
+                  <span className="navbar-avatar">{companyName.charAt(0)}</span>
+                  <span className="navbar-company">{companyName}</span>
+                </div>
+              )}
               <button onClick={signOut} className="btn btn-outline btn-sm">Sign Out</button>
             </>
           ) : (

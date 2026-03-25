@@ -88,10 +88,10 @@ export default function DashboardPage() {
     <div className="page">
       <div className="dashboard-header">
         <div className="dashboard-header-left">
-          <div className="dashboard-avatar">{companyName?.charAt(0)}</div>
+          {companyName && <div className="dashboard-avatar">{companyName.charAt(0)}</div>}
           <div>
             <h2>Dashboard</h2>
-            <p className="dashboard-company">{companyName}</p>
+            {companyName && <p className="dashboard-company">{companyName}</p>}
           </div>
         </div>
         {isApproved ? (

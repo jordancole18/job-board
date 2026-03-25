@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Search, MapPin, DollarSign, Tag } from 'lucide-react';
+import { Search, MapPin, DollarSign } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import { haversineDistance, radiusToZoom } from '../utils/distance';
 import MapView from '../components/MapView';
