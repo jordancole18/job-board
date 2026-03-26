@@ -24,33 +24,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isApproved, setIsApproved] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Step 1: Listen for auth changes — NEVER make DB calls inside this callback.
+  // Supabase JS v2.64+ runs these callbacks inside an internal auth lock;
+  // any supabase.from() call tries to re-acquire that lock → deadlock → every
+  // query in the app hangs forever.
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) {
-        await fetchEmployerInfo(session.user.id);
-      }
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) {
-        const pendingCompany = localStorage.getItem('pending_company_name');
-        if (pendingCompany) {
-          localStorage.removeItem('pending_company_name');
-          await supabase
-            .from('employers')
-            .insert({ user_id: session.user.id, company_name: pendingCompany });
-          setCompanyName(pendingCompany);
-          setIsAdmin(false);
-          setIsApproved(false);
-        } else {
-          await fetchEmployerInfo(session.user.id);
-        }
-      } else {
+      if (!session?.user) {
         setCompanyName(null);
         setIsAdmin(false);
         setIsApproved(false);
@@ -59,6 +47,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Step 2: Fetch employer info in a SEPARATE effect, outside the auth lock.
+  useEffect(() => {
+    if (loading) return; // wait for auth to initialise first
+    if (!user) return;
+
+    const pendingCompany = localStorage.getItem('pending_company_name');
+    if (pendingCompany) {
+      localStorage.removeItem('pending_company_name');
+      supabase
+        .from('employers')
+        .insert({ user_id: user.id, company_name: pendingCompany })
+        .then(() => {
+          setCompanyName(pendingCompany);
+          setIsAdmin(false);
+          setIsApproved(false);
+        });
+    } else {
+      fetchEmployerInfo(user.id);
+    }
+  }, [user?.id, loading]);
 
   async function fetchEmployerInfo(userId: string) {
     const { data, error } = await supabase

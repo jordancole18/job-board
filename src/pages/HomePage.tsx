@@ -41,7 +41,7 @@ export default function HomePage() {
   const [tagFilter, setTagFilter] = useState('');
 
   useEffect(() => {
-    Promise.all([fetchJobs(), fetchTags()]).then(() => setLoading(false));
+    Promise.all([fetchJobs(), fetchTags()]).finally(() => setLoading(false));
   }, []);
 
   async function fetchJobs() {
