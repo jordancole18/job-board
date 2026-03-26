@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Tag, FileText, Star, Plus, Trash2, Download, Eye, Pencil, Check, X, Users, ShieldCheck, ShieldX } from 'lucide-react';
+import { Tag, FileText, Star, Plus, Trash2, Download, Eye, Pencil, Check, X, Users, ShieldCheck, ShieldX, Crown, Briefcase } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabase';
 
@@ -23,14 +23,16 @@ interface Submission {
   created_at: string;
 }
 
-interface FeaturedJob {
+interface AdminJob {
   id: string;
   title: string;
   company_name: string;
   city: string;
   state: string;
+  job_type: string;
   is_featured: boolean;
   status: string;
+  created_at: string;
 }
 
 interface Employer {
@@ -50,7 +52,7 @@ const AVATAR_COLORS = [
 export default function AdminPage() {
   const { user, isAdmin, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'tags' | 'submissions' | 'featured' | 'employers'>('employers');
+  const [activeTab, setActiveTab] = useState<'tags' | 'submissions' | 'jobs' | 'employers'>('employers');
 
   // Tags state
   const [tags, setTags] = useState<TagItem[]>([]);
@@ -65,7 +67,7 @@ export default function AdminPage() {
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
 
   // Featured jobs state
-  const [allJobs, setAllJobs] = useState<FeaturedJob[]>([]);
+  const [allJobs, setAllJobs] = useState<AdminJob[]>([]);
 
   // Employers state
   const [employers, setEmployers] = useState<Employer[]>([]);
@@ -99,7 +101,7 @@ export default function AdminPage() {
   async function loadJobs() {
     const { data } = await supabase
       .from('jobs')
-      .select('id, title, company_name, city, state, is_featured, status')
+      .select('id, title, company_name, city, state, job_type, is_featured, status, created_at')
       .order('created_at', { ascending: false });
     if (data) setAllJobs(data);
   }
@@ -115,6 +117,15 @@ export default function AdminPage() {
   async function toggleApproval(employerId: string, currentlyApproved: boolean) {
     await supabase.from('employers').update({ is_approved: !currentlyApproved }).eq('id', employerId);
     setEmployers((prev) => prev.map((e) => e.id === employerId ? { ...e, is_approved: !currentlyApproved } : e));
+  }
+
+  async function toggleAdmin(employerId: string, currentlyAdmin: boolean) {
+    const action = currentlyAdmin ? 'remove admin privileges from' : 'grant admin privileges to';
+    if (!confirm(`Are you sure you want to ${action} this employer?`)) return;
+    const updates: { is_admin: boolean; is_approved?: boolean } = { is_admin: !currentlyAdmin };
+    if (!currentlyAdmin) updates.is_approved = true;
+    await supabase.from('employers').update(updates).eq('id', employerId);
+    setEmployers((prev) => prev.map((e) => e.id === employerId ? { ...e, is_admin: !currentlyAdmin, ...(updates.is_approved ? { is_approved: true } : {}) } : e));
   }
 
   async function addTag() {
@@ -206,10 +217,11 @@ export default function AdminPage() {
           {submissions.length > 0 && <span className="tab-badge">{submissions.length}</span>}
         </button>
         <button
-          className={`dashboard-tab ${activeTab === 'featured' ? 'dashboard-tab-active' : ''}`}
-          onClick={() => setActiveTab('featured')}
+          className={`dashboard-tab ${activeTab === 'jobs' ? 'dashboard-tab-active' : ''}`}
+          onClick={() => setActiveTab('jobs')}
         >
-          <Star size={16} /> Featured Jobs
+          <Briefcase size={16} /> Job Postings
+          {allJobs.length > 0 && <span className="tab-badge">{allJobs.length}</span>}
         </button>
       </div>
 
@@ -239,11 +251,7 @@ export default function AdminPage() {
                       </div>
                     </div>
                     <div className="admin-employer-actions">
-                      {emp.is_admin ? (
-                        <span className="status-badge" style={{ backgroundColor: 'rgba(56,182,83,0.1)', color: '#2d9a46' }}>
-                          Admin
-                        </span>
-                      ) : (
+                      {!emp.is_admin && (
                         <button
                           className={`btn btn-sm ${emp.is_approved ? 'btn-outline' : 'btn-primary'}`}
                           onClick={() => toggleApproval(emp.id, emp.is_approved)}
@@ -253,6 +261,18 @@ export default function AdminPage() {
                           ) : (
                             <><ShieldCheck size={14} /> Approve</>
                           )}
+                        </button>
+                      )}
+                      {emp.user_id === user!.id ? (
+                        <span className="status-badge" style={{ backgroundColor: 'rgba(56,182,83,0.1)', color: '#2d9a46' }}>
+                          <Crown size={12} /> You
+                        </span>
+                      ) : (
+                        <button
+                          className={`btn btn-sm ${emp.is_admin ? 'btn-danger' : 'btn-outline'}`}
+                          onClick={() => toggleAdmin(emp.id, emp.is_admin)}
+                        >
+                          <Crown size={14} /> {emp.is_admin ? 'Remove Admin' : 'Make Admin'}
                         </button>
                       )}
                     </div>
@@ -402,8 +422,8 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* Featured Jobs Management */}
-      {activeTab === 'featured' && (
+      {/* Job Postings Management */}
+      {activeTab === 'jobs' && (
         <div className="admin-section">
           {allJobs.length === 0 ? (
             <div className="empty-state">
@@ -415,7 +435,9 @@ export default function AdminPage() {
                 <div key={job.id} className={`admin-featured-item ${job.is_featured ? 'admin-featured-active' : ''}`}>
                   <div className="admin-featured-info">
                     <h4>{job.title}</h4>
-                    <span className="text-muted">{job.company_name} &middot; {job.city}, {job.state}</span>
+                    <span className="text-muted">
+                      {job.company_name} &middot; {job.city}, {job.state} &middot; {job.job_type} &middot; Posted {new Date(job.created_at).toLocaleDateString()}
+                    </span>
                   </div>
                   <div className="admin-featured-actions">
                     <span className={`status-badge ${job.status === 'active' ? '' : 'status-badge-muted'}`}
@@ -427,7 +449,7 @@ export default function AdminPage() {
                       className={`btn btn-sm ${job.is_featured ? 'btn-primary' : 'btn-outline'}`}
                       onClick={() => toggleFeatured(job.id, job.is_featured)}
                     >
-                      <Star size={14} /> {job.is_featured ? 'Featured' : 'Make Featured'}
+                      <Star size={14} /> {job.is_featured ? 'Featured' : 'Feature'}
                     </button>
                     <button
                       className="btn btn-sm btn-danger"

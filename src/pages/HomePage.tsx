@@ -94,6 +94,10 @@ export default function HomePage() {
     return counts;
   }, [jobs]);
 
+  const topTags = useMemo(() =>
+    [...tags].filter((t) => tagCounts[t.id] > 0).sort((a, b) => (tagCounts[b.id] || 0) - (tagCounts[a.id] || 0)).slice(0, 4),
+    [tags, tagCounts]);
+
   return (
     <>
       <section className="hero">
@@ -172,30 +176,32 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="categories-section">
-        <div className="section-header">
-          <h2>Popular Categories</h2>
-        </div>
-        <div className="categories-grid">
-          {tags.map((tag) => (
-            <div
-              key={tag.id}
-              className="category-card"
-              onClick={() => navigate(`/map?tag=${tag.id}`)}
-            >
-              <div className="category-icon" style={{ backgroundColor: tag.color + '18', color: tag.color }}>
-                <Briefcase size={22} />
-              </div>
-              <div>
-                <div className="category-name">{tag.name}</div>
-                <div className="category-count">
-                  {tagCounts[tag.id] || 0} positions
+      {topTags.length > 0 && (
+        <section className="categories-section">
+          <div className="section-header">
+            <h2>Popular Categories</h2>
+          </div>
+          <div className="categories-grid">
+            {topTags.map((tag) => (
+              <div
+                key={tag.id}
+                className="category-card"
+                onClick={() => navigate(`/map?tag=${tag.id}`)}
+              >
+                <div className="category-icon" style={{ backgroundColor: tag.color + '18', color: tag.color }}>
+                  <Briefcase size={22} />
+                </div>
+                <div>
+                  <div className="category-name">{tag.name}</div>
+                  <div className="category-count">
+                    {tagCounts[tag.id] || 0} positions
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="page">
         {/* Featured Jobs */}
