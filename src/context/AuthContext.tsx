@@ -4,12 +4,21 @@ import { supabase } from '../utils/supabase';
 
 const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
 
-function notifyNewEmployer(companyName: string, email: string) {
-  fetch(`${FUNCTIONS_URL}/notify-new-employer`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ companyName, email }),
-  }).catch(() => {});
+async function notifyNewEmployer(companyName: string, email: string) {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return;
+    fetch(`${FUNCTIONS_URL}/notify-new-employer`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ companyName, email }),
+    }).catch(() => {});
+  } catch {
+    // Silently fail — notification is best-effort
+  }
 }
 
 interface AuthState {
