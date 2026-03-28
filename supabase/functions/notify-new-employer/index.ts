@@ -3,7 +3,6 @@ import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
 
 const SMTP_HOST = Deno.env.get("SMTP_HOST");
 const SMTP_PORT = Number(Deno.env.get("SMTP_PORT") || "465");
@@ -11,11 +10,8 @@ const SMTP_USER = Deno.env.get("SMTP_USER");
 const SMTP_PASS = Deno.env.get("SMTP_PASS");
 const SMTP_FROM = Deno.env.get("SMTP_FROM") || SMTP_USER;
 
-const ALLOWED_ORIGINS = [
-  "https://associationcareers.realestate",
-  "http://localhost:5173",
-  "http://localhost:4173",
-];
+// Shared secret to verify the request came from our DB trigger
+const FUNCTION_SECRET = Deno.env.get("FUNCTION_SECRET") || "";
 
 function escapeHtml(str: string): string {
   return str
@@ -25,40 +21,18 @@ function escapeHtml(str: string): string {
     .replace(/"/g, "&quot;");
 }
 
-function getCorsHeaders(req: Request) {
-  const origin = req.headers.get("origin") || "";
-  const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
-  return {
-    "Access-Control-Allow-Origin": allowed,
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  };
-}
-
 Deno.serve(async (req) => {
-  const cors = getCorsHeaders(req);
-
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: cors });
+    return new Response(null, { status: 204 });
   }
 
   try {
-    // Verify the caller is authenticated
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader) {
+    // Verify the request came from our DB trigger via shared secret
+    const authHeader = req.headers.get("authorization") || "";
+    if (authHeader !== `Bearer ${FUNCTION_SECRET}`) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
-        headers: { "Content-Type": "application/json", ...cors },
-      });
-    }
-
-    // Verify the JWT is valid using Supabase Auth
-    const token = authHeader.replace("Bearer ", "");
-    const supabaseAuth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json", ...cors },
+        headers: { "Content-Type": "application/json" },
       });
     }
 
@@ -67,11 +41,11 @@ Deno.serve(async (req) => {
     if (!companyName || !email || typeof companyName !== "string" || typeof email !== "string") {
       return new Response(JSON.stringify({ error: "Invalid request" }), {
         status: 400,
-        headers: { "Content-Type": "application/json", ...cors },
+        headers: { "Content-Type": "application/json" },
       });
     }
 
-    // Read the notification email from site_settings using the service role key
+    // Read the notification email from site_settings
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const { data: setting } = await supabase
       .from("site_settings")
@@ -82,7 +56,7 @@ Deno.serve(async (req) => {
     const notifyEmail = setting?.value;
     if (!notifyEmail) {
       return new Response(JSON.stringify({ message: "No notification email configured, skipping" }), {
-        headers: { "Content-Type": "application/json", ...cors },
+        headers: { "Content-Type": "application/json" },
       });
     }
 
@@ -90,11 +64,10 @@ Deno.serve(async (req) => {
       console.error("SMTP not configured");
       return new Response(JSON.stringify({ error: "Email service unavailable" }), {
         status: 500,
-        headers: { "Content-Type": "application/json", ...cors },
+        headers: { "Content-Type": "application/json" },
       });
     }
 
-    // Sanitize user input before injecting into HTML
     const safeCompanyName = escapeHtml(companyName.slice(0, 200));
     const safeEmail = escapeHtml(email.slice(0, 200));
 
@@ -145,13 +118,13 @@ Deno.serve(async (req) => {
     await client.close();
 
     return new Response(JSON.stringify({ message: "Notification sent" }), {
-      headers: { "Content-Type": "application/json", ...cors },
+      headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
     console.error("Function error:", err);
     return new Response(JSON.stringify({ error: "Internal error" }), {
       status: 500,
-      headers: { "Content-Type": "application/json", ...getCorsHeaders(req) },
+      headers: { "Content-Type": "application/json" },
     });
   }
 });

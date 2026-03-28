@@ -2,24 +2,6 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../utils/supabase';
 
-const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
-
-async function notifyNewEmployer(companyName: string, email: string) {
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) return;
-    fetch(`${FUNCTIONS_URL}/notify-new-employer`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({ companyName, email }),
-    }).catch(() => {});
-  } catch {
-    // Silently fail — notification is best-effort
-  }
-}
 
 interface AuthState {
   session: Session | null;
@@ -113,7 +95,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setCompanyName(pendingCompany);
           setIsAdmin(false);
           setIsApproved(false);
-          notifyNewEmployer(pendingCompany, pendingEmail || user.email || '');
         });
     } else {
       fetchEmployerInfo(user.id);
@@ -129,7 +110,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .insert({ user_id: data.user!.id, company_name: company, email });
       if (insertError) return insertError.message;
       setCompanyName(company);
-      notifyNewEmployer(company, email);
     } else if (data.user) {
       localStorage.setItem('pending_company_name', company);
       localStorage.setItem('pending_employer_email', email);
