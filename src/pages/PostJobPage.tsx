@@ -4,6 +4,7 @@ import { ArrowLeft, Clock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabase';
 import { geocodeAddress, normalizeState } from '../utils/geocode';
+import { JOB_TYPE_OPTIONS, ARRANGEMENT_OPTIONS } from '../constants/jobStyles';
 
 interface TagOption {
   id: string;
@@ -23,7 +24,8 @@ export default function PostJobPage() {
     description: '',
     requirements: '',
     salary: '',
-    jobType: 'in-office' as string,
+    jobType: 'full-time' as string,
+    workArrangement: 'on-site' as string,
     address: '',
     city: '',
     state: '',
@@ -71,6 +73,7 @@ export default function PostJobPage() {
       requirements: form.requirements,
       salary: form.salary,
       job_type: form.jobType,
+      work_arrangement: form.workArrangement,
       address: form.address,
       city: form.city,
       state,
@@ -149,10 +152,17 @@ export default function PostJobPage() {
             <div className="form-group">
               <label>Job Type</label>
               <select className="input" value={form.jobType} onChange={(e) => update('jobType', e.target.value)}>
-                <option value="remote">Remote</option>
-                <option value="hybrid">Hybrid</option>
-                <option value="in-office">In-Office</option>
-                <option value="contract">Contract</option>
+                {JOB_TYPE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Work Arrangement</label>
+              <select className="input" value={form.workArrangement} onChange={(e) => update('workArrangement', e.target.value)}>
+                {ARRANGEMENT_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
               </select>
             </div>
           </div>

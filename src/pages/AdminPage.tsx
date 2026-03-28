@@ -30,6 +30,7 @@ interface AdminJob {
   city: string;
   state: string;
   job_type: string;
+  work_arrangement: string;
   is_featured: boolean;
   status: string;
   created_at: string;
@@ -101,7 +102,7 @@ export default function AdminPage() {
   async function loadJobs() {
     const { data } = await supabase
       .from('jobs')
-      .select('id, title, company_name, city, state, job_type, is_featured, status, created_at')
+      .select('id, title, company_name, city, state, job_type, work_arrangement, is_featured, status, created_at')
       .order('created_at', { ascending: false });
     if (data) setAllJobs(data);
   }
@@ -436,7 +437,7 @@ export default function AdminPage() {
                   <div className="admin-featured-info">
                     <h4>{job.title}</h4>
                     <span className="text-muted">
-                      {job.company_name} &middot; {job.city}, {job.state} &middot; {job.job_type} &middot; Posted {new Date(job.created_at).toLocaleDateString()}
+                      {job.company_name} &middot; {job.city}, {job.state} &middot; {job.work_arrangement} &middot; {job.job_type} &middot; Posted {new Date(job.created_at).toLocaleDateString()}
                     </span>
                   </div>
                   <div className="admin-featured-actions">

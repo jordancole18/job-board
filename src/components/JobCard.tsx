@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { MapPin, DollarSign, Clock, Star } from 'lucide-react';
+import { getArrangementStyle, getJobTypeStyle } from '../constants/jobStyles';
 
 interface Props {
   id: string;
@@ -9,6 +10,7 @@ interface Props {
   state: string;
   salary: string;
   jobType: string;
+  workArrangement: string;
   createdAt: string;
   isFeatured?: boolean;
   tags?: { name: string; color: string }[];
@@ -19,19 +21,13 @@ const AVATAR_COLORS = [
   '#eab308', '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6',
 ];
 
-const TYPE_STYLES: Record<string, { bg: string; text: string }> = {
-  remote: { bg: 'rgba(59,130,246,0.1)', text: '#2563eb' },
-  hybrid: { bg: 'rgba(99,102,241,0.1)', text: '#6366f1' },
-  'in-office': { bg: 'rgba(56,182,83,0.1)', text: '#2d9a46' },
-  contract: { bg: 'rgba(249,115,22,0.1)', text: '#ea580c' },
-};
-
-export default function JobCard({ id, title, companyName, city, state, salary, jobType, createdAt, isFeatured, tags }: Props) {
+export default function JobCard({ id, title, companyName, city, state, salary, jobType, workArrangement, createdAt, isFeatured, tags }: Props) {
   const daysAgo = Math.floor((Date.now() - new Date(createdAt).getTime()) / 86400000);
   const timeLabel = daysAgo === 0 ? 'Today' : daysAgo === 1 ? '1d ago' : `${daysAgo}d ago`;
   const colorIndex = companyName.charCodeAt(0) % AVATAR_COLORS.length;
   const avatarColor = AVATAR_COLORS[colorIndex];
-  const typeStyle = TYPE_STYLES[jobType] || { bg: 'rgba(107,114,128,0.1)', text: '#6b7280' };
+  const arrangementStyle = getArrangementStyle(workArrangement);
+  const typeStyle = getJobTypeStyle(jobType);
 
   return (
     <Link to={`/jobs/${id}`} className={`job-card ${isFeatured ? 'job-card-featured' : ''}`}>
@@ -68,6 +64,12 @@ export default function JobCard({ id, title, companyName, city, state, salary, j
         )}
       </div>
       <div className="job-card-actions">
+        <span
+          className="job-type-badge"
+          style={{ backgroundColor: arrangementStyle.bg, color: arrangementStyle.text }}
+        >
+          {workArrangement}
+        </span>
         <span
           className="job-type-badge"
           style={{ backgroundColor: typeStyle.bg, color: typeStyle.text }}
