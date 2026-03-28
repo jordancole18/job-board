@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Search, MapPin, DollarSign } from 'lucide-react';
+import { Search, MapPin, DollarSign, List, Map } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import { haversineDistance, radiusToZoom } from '../utils/distance';
 import { getArrangementStyle, getJobTypeStyle, JOB_TYPE_OPTIONS, ARRANGEMENT_OPTIONS } from '../constants/jobStyles';
@@ -61,6 +61,7 @@ export default function MapPage() {
   const [mapCenter, setMapCenter] = useState<[number, number]>(US_CENTER);
   const [mapZoom, setMapZoom] = useState(4);
   const [hoveredJob, setHoveredJob] = useState<string | null>(null);
+  const [mobileView, setMobileView] = useState<'list' | 'map'>('list');
 
   useEffect(() => {
     async function load() {
@@ -137,7 +138,21 @@ export default function MapPage() {
 
   return (
     <div className="explore-page">
-      <div className="explore-sidebar">
+      <div className="explore-mobile-toggle">
+        <button
+          className={`explore-toggle-btn ${mobileView === 'list' ? 'explore-toggle-active' : ''}`}
+          onClick={() => setMobileView('list')}
+        >
+          <List size={16} /> List
+        </button>
+        <button
+          className={`explore-toggle-btn ${mobileView === 'map' ? 'explore-toggle-active' : ''}`}
+          onClick={() => setMobileView('map')}
+        >
+          <Map size={16} /> Map
+        </button>
+      </div>
+      <div className={`explore-sidebar explore-mobile-${mobileView === 'list' ? 'show' : 'hide'}`}>
         <div className="explore-sidebar-header">
           <h2>Explore Jobs</h2>
           <span className="explore-count">{filtered.length} results</span>
@@ -280,7 +295,7 @@ export default function MapPage() {
         </div>
       </div>
 
-      <div className="explore-map">
+      <div className={`explore-map explore-mobile-${mobileView === 'map' ? 'show' : 'hide'}`}>
         {loading ? (
           <div className="loading">Loading map...</div>
         ) : (
