@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Briefcase } from 'lucide-react';
+import { Briefcase, Mail } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function AuthPage() {
@@ -10,6 +10,7 @@ export default function AuthPage() {
   const [companyName, setCompanyName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [checkEmail, setCheckEmail] = useState(false);
   const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
 
@@ -24,9 +25,14 @@ export default function AuthPage() {
         setLoading(false);
         return;
       }
-      const err = await signUp(email, password, companyName.trim());
-      if (err) {
-        setError(err);
+      const result = await signUp(email, password, companyName.trim());
+      if (result === 'check_email') {
+        setCheckEmail(true);
+        setLoading(false);
+        return;
+      }
+      if (result) {
+        setError(result);
         setLoading(false);
         return;
       }
@@ -40,6 +46,30 @@ export default function AuthPage() {
     }
 
     navigate('/dashboard');
+  }
+
+  if (checkEmail) {
+    return (
+      <div className="page auth-page">
+        <div className="auth-card" style={{ textAlign: 'center' }}>
+          <div className="auth-header">
+            <div style={{ width: 52, height: 52, borderRadius: 16, backgroundColor: '#38b653', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}>
+              <Mail size={24} color="white" />
+            </div>
+            <h2>Check your email</h2>
+            <p className="auth-subtitle">
+              We sent a confirmation link to <strong>{email}</strong>. Click the link in the email to activate your account.
+            </p>
+          </div>
+          <p style={{ color: '#6b7280', fontSize: '0.875rem', marginTop: '1.5rem' }}>
+            Didn't receive it? Check your spam folder or{' '}
+            <button onClick={() => { setCheckEmail(false); setIsSignUp(true); }} className="link-btn">
+              try again
+            </button>
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (

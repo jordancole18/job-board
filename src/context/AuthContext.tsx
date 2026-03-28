@@ -109,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } else if (data.user) {
       localStorage.setItem('pending_company_name', company);
       localStorage.setItem('pending_employer_email', email);
+      return 'check_email';
     }
     return null;
   }
