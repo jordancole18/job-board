@@ -136,10 +136,10 @@ export default function HomePage() {
                 className="hero-search-select"
               >
                 <option value="">All Types</option>
-                <option value="full-time">Full-Time</option>
-                <option value="part-time">Part-Time</option>
-                <option value="contract">Contract</option>
                 <option value="remote">Remote</option>
+                <option value="hybrid">Hybrid</option>
+                <option value="in-office">In-Office</option>
+                <option value="contract">Contract</option>
               </select>
             </div>
             <div className="hero-search-field">

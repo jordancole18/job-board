@@ -31,10 +31,10 @@ const AVATAR_COLORS = [
 ];
 
 const TYPE_STYLES: Record<string, { bg: string; text: string }> = {
-  'full-time': { bg: 'rgba(56,182,83,0.1)', text: '#2d9a46' },
-  'part-time': { bg: 'rgba(99,102,241,0.1)', text: '#6366f1' },
-  contract: { bg: 'rgba(249,115,22,0.1)', text: '#ea580c' },
   remote: { bg: 'rgba(59,130,246,0.1)', text: '#2563eb' },
+  hybrid: { bg: 'rgba(99,102,241,0.1)', text: '#6366f1' },
+  'in-office': { bg: 'rgba(56,182,83,0.1)', text: '#2d9a46' },
+  contract: { bg: 'rgba(249,115,22,0.1)', text: '#ea580c' },
 };
 
 export default function JobDetailPage() {

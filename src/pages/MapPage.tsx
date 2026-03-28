@@ -34,10 +34,10 @@ const AVATAR_COLORS = [
 ];
 
 const TYPE_STYLES: Record<string, { bg: string; text: string }> = {
-  'full-time': { bg: 'rgba(56,182,83,0.1)', text: '#2d9a46' },
-  'part-time': { bg: 'rgba(99,102,241,0.1)', text: '#6366f1' },
-  contract: { bg: 'rgba(249,115,22,0.1)', text: '#ea580c' },
   remote: { bg: 'rgba(59,130,246,0.1)', text: '#2563eb' },
+  hybrid: { bg: 'rgba(99,102,241,0.1)', text: '#6366f1' },
+  'in-office': { bg: 'rgba(56,182,83,0.1)', text: '#2d9a46' },
+  contract: { bg: 'rgba(249,115,22,0.1)', text: '#ea580c' },
 };
 
 const RADIUS_OPTIONS = [
@@ -190,10 +190,10 @@ export default function MapPage() {
               className="input explore-type-select"
             >
               <option value="">All Types</option>
-              <option value="full-time">Full-Time</option>
-              <option value="part-time">Part-Time</option>
-              <option value="contract">Contract</option>
               <option value="remote">Remote</option>
+              <option value="hybrid">Hybrid</option>
+              <option value="in-office">In-Office</option>
+              <option value="contract">Contract</option>
             </select>
             <select
               value={tagFilter}

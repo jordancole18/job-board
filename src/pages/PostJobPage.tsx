@@ -23,7 +23,7 @@ export default function PostJobPage() {
     description: '',
     requirements: '',
     salary: '',
-    jobType: 'full-time' as string,
+    jobType: 'in-office' as string,
     address: '',
     city: '',
     state: '',
@@ -149,10 +149,10 @@ export default function PostJobPage() {
             <div className="form-group">
               <label>Job Type</label>
               <select className="input" value={form.jobType} onChange={(e) => update('jobType', e.target.value)}>
-                <option value="full-time">Full-Time</option>
-                <option value="part-time">Part-Time</option>
-                <option value="contract">Contract</option>
                 <option value="remote">Remote</option>
+                <option value="hybrid">Hybrid</option>
+                <option value="in-office">In-Office</option>
+                <option value="contract">Contract</option>
               </select>
             </div>
           </div>
