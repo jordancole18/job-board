@@ -58,30 +58,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Step 2: Fetch employer info in a SEPARATE effect, outside the auth lock.
-  useEffect(() => {
-    if (loading) return; // wait for auth to initialise first
-    if (!user) return;
-
-    const pendingCompany = localStorage.getItem('pending_company_name');
-    const pendingEmail = localStorage.getItem('pending_employer_email');
-    if (pendingCompany) {
-      localStorage.removeItem('pending_company_name');
-      localStorage.removeItem('pending_employer_email');
-      supabase
-        .from('employers')
-        .insert({ user_id: user.id, company_name: pendingCompany })
-        .then(() => {
-          setCompanyName(pendingCompany);
-          setIsAdmin(false);
-          setIsApproved(false);
-          notifyNewEmployer(pendingCompany, pendingEmail || user.email || '');
-        });
-    } else {
-      fetchEmployerInfo(user.id);
-    }
-  }, [user?.id, loading]);
-
   async function fetchEmployerInfo(userId: string) {
     const { data, error } = await supabase
       .from('employers')
@@ -94,11 +70,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (data) {
+      if (data.is_disabled) {
+        await supabase.auth.signOut();
+        return;
+      }
       setCompanyName(data.company_name ?? null);
       setIsAdmin(data.is_admin ?? false);
       setIsApproved(data.is_approved ?? false);
     }
   }
+
+  // Step 2: Fetch employer info in a SEPARATE effect, outside the auth lock.
+  useEffect(() => {
+    if (loading) return; // wait for auth to initialise first
+    if (!user) return;
+
+    const pendingCompany = localStorage.getItem('pending_company_name');
+    const pendingEmail = localStorage.getItem('pending_employer_email');
+    if (pendingCompany) {
+      localStorage.removeItem('pending_company_name');
+      localStorage.removeItem('pending_employer_email');
+      console.log('[AuthContext] Creating employer record for:', pendingCompany);
+      supabase
+        .from('employers')
+        .insert({ user_id: user.id, company_name: pendingCompany, email: pendingEmail || user.email })
+        .then(({ error }) => {
+          if (error) {
+            console.error('[AuthContext] Employer insert failed:', error.message);
+            fetchEmployerInfo(user.id);
+            return;
+          }
+          console.log('[AuthContext] Employer created, sending notification');
+          setCompanyName(pendingCompany);
+          setIsAdmin(false);
+          setIsApproved(false);
+          notifyNewEmployer(pendingCompany, pendingEmail || user.email || '');
+        });
+    } else {
+      fetchEmployerInfo(user.id);
+    }
+  }, [user?.id, loading]);
 
   async function signUp(email: string, password: string, company: string): Promise<string | null> {
     const { data, error } = await supabase.auth.signUp({ email, password });
@@ -106,7 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (data.session) {
       const { error: insertError } = await supabase
         .from('employers')
-        .insert({ user_id: data.user!.id, company_name: company });
+        .insert({ user_id: data.user!.id, company_name: company, email });
       if (insertError) return insertError.message;
       setCompanyName(company);
       notifyNewEmployer(company, email);

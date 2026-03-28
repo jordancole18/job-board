@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Tag, FileText, Star, Plus, Trash2, Download, Eye, Pencil, Check, X, Users, ShieldCheck, ShieldX, Crown, Briefcase, Settings } from 'lucide-react';
+import { Tag, FileText, Star, Plus, Trash2, Download, Eye, Pencil, Check, X, Users, ShieldCheck, ShieldX, Crown, Briefcase, Settings, Search, Ban } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabase';
 import { JOB_TYPE_OPTIONS, ARRANGEMENT_OPTIONS } from '../constants/jobStyles';
@@ -45,8 +45,10 @@ interface Employer {
   id: string;
   user_id: string;
   company_name: string;
+  email: string | null;
   is_admin: boolean;
   is_approved: boolean;
+  is_disabled: boolean;
   created_at: string;
 }
 
@@ -77,6 +79,7 @@ export default function AdminPage() {
 
   // Employers state
   const [employers, setEmployers] = useState<Employer[]>([]);
+  const [employerSearch, setEmployerSearch] = useState('');
 
   // Job editing state
   const [editingJobId, setEditingJobId] = useState<string | null>(null);
@@ -144,6 +147,32 @@ export default function AdminPage() {
     if (!currentlyAdmin) updates.is_approved = true;
     await supabase.from('employers').update(updates).eq('id', employerId);
     setEmployers((prev) => prev.map((e) => e.id === employerId ? { ...e, is_admin: !currentlyAdmin, ...(updates.is_approved ? { is_approved: true } : {}) } : e));
+  }
+
+  async function toggleDisabled(employerId: string, currentlyDisabled: boolean) {
+    const action = currentlyDisabled ? 'enable' : 'disable';
+    if (!confirm(`Are you sure you want to ${action} this user? ${!currentlyDisabled ? 'They will be signed out and unable to log in.' : ''}`)) return;
+    await supabase.from('employers').update({ is_disabled: !currentlyDisabled }).eq('id', employerId);
+    setEmployers((prev) => prev.map((e) => e.id === employerId ? { ...e, is_disabled: !currentlyDisabled } : e));
+  }
+
+  async function deleteEmployer(employerId: string) {
+    if (!confirm('Permanently delete this user and all their job postings, applications, and data? This cannot be undone.')) return;
+    // Delete all related data
+    const emp = employers.find((e) => e.id === employerId);
+    if (!emp) return;
+    // Get their jobs to clean up related records
+    const { data: jobs } = await supabase.from('jobs').select('id').eq('employer_id', emp.user_id);
+    if (jobs) {
+      for (const job of jobs) {
+        await supabase.from('job_tags').delete().eq('job_id', job.id);
+        await supabase.from('applications').delete().eq('job_id', job.id);
+        await supabase.from('job_views').delete().eq('job_id', job.id);
+      }
+      await supabase.from('jobs').delete().eq('employer_id', emp.user_id);
+    }
+    await supabase.from('employers').delete().eq('id', employerId);
+    setEmployers((prev) => prev.filter((e) => e.id !== employerId));
   }
 
   async function addTag() {
@@ -304,54 +333,97 @@ export default function AdminPage() {
       {/* Employers Management */}
       {activeTab === 'employers' && (
         <div className="admin-section">
+          <div className="explore-keyword-row" style={{ marginBottom: '1rem' }}>
+            <div className="explore-search" style={{ flex: 1 }}>
+              <Search size={16} className="explore-search-icon" />
+              <input
+                type="text"
+                placeholder="Search by company name or email..."
+                value={employerSearch}
+                onChange={(e) => setEmployerSearch(e.target.value)}
+                className="explore-search-input"
+              />
+            </div>
+          </div>
           {employers.length === 0 ? (
             <div className="empty-state">
               <h3>No employer accounts yet</h3>
             </div>
           ) : (
             <div className="admin-employers-list">
-              {employers.map((emp) => {
+              {employers
+                .filter((emp) => {
+                  if (!employerSearch) return true;
+                  const q = employerSearch.toLowerCase();
+                  return emp.company_name.toLowerCase().includes(q) ||
+                    (emp.email && emp.email.toLowerCase().includes(q));
+                })
+                .map((emp) => {
                 const color = AVATAR_COLORS[emp.company_name.charCodeAt(0) % AVATAR_COLORS.length];
                 return (
-                  <div key={emp.id} className={`admin-employer-item ${!emp.is_approved ? 'admin-employer-pending' : ''}`}>
+                  <div key={emp.id} className={`admin-employer-item ${!emp.is_approved ? 'admin-employer-pending' : ''}`} style={emp.is_disabled ? { opacity: 0.5 } : {}}>
                     <div className="admin-employer-info">
-                      <div className="ej-app-avatar" style={{ backgroundColor: color }}>
+                      <div className="ej-app-avatar" style={{ backgroundColor: emp.is_disabled ? '#6b7280' : color }}>
                         {emp.company_name.charAt(0)}
                       </div>
                       <div>
                         <strong>{emp.company_name}</strong>
+                        {emp.is_disabled && (
+                          <span className="status-badge" style={{ backgroundColor: 'rgba(239,68,68,0.1)', color: '#dc2626', marginLeft: '0.5rem', fontSize: '0.7rem' }}>
+                            <Ban size={10} /> Disabled
+                          </span>
+                        )}
                         <span className="ej-app-email">
+                          {emp.email && <>{emp.email} · </>}
                           Joined {new Date(emp.created_at).toLocaleDateString()}
                           {emp.is_admin && ' · Admin'}
                         </span>
                       </div>
                     </div>
-                    <div className="admin-employer-actions">
-                      {!emp.is_admin && (
-                        <button
-                          className={`btn btn-sm ${emp.is_approved ? 'btn-outline' : 'btn-primary'}`}
-                          onClick={() => toggleApproval(emp.id, emp.is_approved)}
-                        >
-                          {emp.is_approved ? (
-                            <><ShieldX size={14} /> Revoke</>
-                          ) : (
-                            <><ShieldCheck size={14} /> Approve</>
-                          )}
-                        </button>
-                      )}
-                      {emp.user_id === user!.id ? (
+                    {emp.user_id === user!.id ? (
+                      <div className="admin-employer-actions">
                         <span className="status-badge" style={{ backgroundColor: 'rgba(56,182,83,0.1)', color: '#2d9a46' }}>
                           <Crown size={12} /> You
                         </span>
-                      ) : (
+                      </div>
+                    ) : (
+                      <div className="admin-employer-actions">
+                        {!emp.is_admin && (
+                          <button
+                            className={`btn btn-sm ${emp.is_approved ? 'btn-outline' : 'btn-primary'}`}
+                            onClick={() => toggleApproval(emp.id, emp.is_approved)}
+                          >
+                            {emp.is_approved ? (
+                              <><ShieldX size={14} /> Revoke</>
+                            ) : (
+                              <><ShieldCheck size={14} /> Approve</>
+                            )}
+                          </button>
+                        )}
+                        <button
+                          className={`btn btn-sm ${emp.is_disabled ? 'btn-primary' : 'btn-outline'}`}
+                          onClick={() => toggleDisabled(emp.id, emp.is_disabled)}
+                        >
+                          {emp.is_disabled ? (
+                            <><ShieldCheck size={14} /> Enable</>
+                          ) : (
+                            <><Ban size={14} /> Disable</>
+                          )}
+                        </button>
                         <button
                           className={`btn btn-sm ${emp.is_admin ? 'btn-danger' : 'btn-outline'}`}
                           onClick={() => toggleAdmin(emp.id, emp.is_admin)}
                         >
                           <Crown size={14} /> {emp.is_admin ? 'Remove Admin' : 'Make Admin'}
                         </button>
-                      )}
-                    </div>
+                        <button
+                          className="btn btn-sm btn-danger"
+                          onClick={() => deleteEmployer(emp.id)}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
