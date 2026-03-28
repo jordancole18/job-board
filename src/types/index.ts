@@ -14,7 +14,8 @@ export interface JobPosting {
   description: string;
   requirements: string;
   salary: string;
-  jobType: 'remote' | 'hybrid' | 'in-office' | 'contract';
+  jobType: 'full-time' | 'part-time' | 'contract';
+  workArrangement: 'on-site' | 'remote' | 'hybrid';
   status: 'active' | 'inactive' | 'filled';
   isFeatured: boolean;
   location: {

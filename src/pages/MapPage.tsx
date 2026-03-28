@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Search, MapPin, DollarSign } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import { haversineDistance, radiusToZoom } from '../utils/distance';
+import { getArrangementStyle, getJobTypeStyle, JOB_TYPE_OPTIONS, ARRANGEMENT_OPTIONS } from '../constants/jobStyles';
 import MapView from '../components/MapView';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 
@@ -18,6 +19,7 @@ interface Job {
   state: string;
   salary: string;
   job_type: string;
+  work_arrangement: string;
   lat: number;
   lng: number;
   job_tags: JobTag[];
@@ -32,13 +34,6 @@ const AVATAR_COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316',
   '#eab308', '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6',
 ];
-
-const TYPE_STYLES: Record<string, { bg: string; text: string }> = {
-  remote: { bg: 'rgba(59,130,246,0.1)', text: '#2563eb' },
-  hybrid: { bg: 'rgba(99,102,241,0.1)', text: '#6366f1' },
-  'in-office': { bg: 'rgba(56,182,83,0.1)', text: '#2d9a46' },
-  contract: { bg: 'rgba(249,115,22,0.1)', text: '#ea580c' },
-};
 
 const RADIUS_OPTIONS = [
   { label: 'Any distance', value: 0 },
@@ -58,6 +53,7 @@ export default function MapPage() {
   const [tags, setTags] = useState<TagOption[]>([]);
   const [keyword, setKeyword] = useState(searchParams.get('q') || '');
   const [typeFilter, setTypeFilter] = useState(searchParams.get('type') || '');
+  const [arrangementFilter, setArrangementFilter] = useState(searchParams.get('arrangement') || '');
   const [tagFilter, setTagFilter] = useState(searchParams.get('tag') || '');
   const [radius, setRadius] = useState(0);
   const [locationCenter, setLocationCenter] = useState<[number, number] | null>(null);
@@ -69,7 +65,7 @@ export default function MapPage() {
   useEffect(() => {
     async function load() {
       const [jobsRes, tagsRes] = await Promise.all([
-        supabase.from('jobs').select('id, title, company_name, city, state, salary, job_type, lat, lng, job_tags(tag_id)').eq('status', 'active'),
+        supabase.from('jobs').select('id, title, company_name, city, state, salary, job_type, work_arrangement, lat, lng, job_tags(tag_id)').eq('status', 'active'),
         supabase.from('tags').select('id, name').order('name'),
       ]);
       if (jobsRes.data) setJobs(jobsRes.data as Job[]);
@@ -130,12 +126,13 @@ export default function MapPage() {
       job.title.toLowerCase().includes(keyword.toLowerCase()) ||
       job.company_name.toLowerCase().includes(keyword.toLowerCase());
     const matchesType = !typeFilter || job.job_type === typeFilter;
+    const matchesArrangement = !arrangementFilter || job.work_arrangement === arrangementFilter;
     const matchesTag = !tagFilter || job.job_tags?.some((jt) => jt.tag_id === tagFilter);
     const matchesRadius =
       !locationCenter ||
       radius === 0 ||
       haversineDistance(locationCenter[0], locationCenter[1], job.lat, job.lng) <= radius;
-    return matchesKeyword && matchesType && matchesTag && matchesRadius;
+    return matchesKeyword && matchesType && matchesArrangement && matchesTag && matchesRadius;
   });
 
   return (
@@ -190,15 +187,28 @@ export default function MapPage() {
               className="input explore-type-select"
             >
               <option value="">All Types</option>
-              <option value="remote">Remote</option>
-              <option value="hybrid">Hybrid</option>
-              <option value="in-office">In-Office</option>
-              <option value="contract">Contract</option>
+              {JOB_TYPE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
             </select>
+            <select
+              value={arrangementFilter}
+              onChange={(e) => setArrangementFilter(e.target.value)}
+              className="input explore-type-select"
+            >
+              <option value="">All Arrangements</option>
+              {ARRANGEMENT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="explore-keyword-row">
             <select
               value={tagFilter}
               onChange={(e) => setTagFilter(e.target.value)}
               className="input explore-type-select"
+              style={{ flex: 1 }}
             >
               <option value="">All Categories</option>
               {tags.map((t) => (
@@ -220,7 +230,8 @@ export default function MapPage() {
           ) : (
             filtered.map((job) => {
               const color = AVATAR_COLORS[job.company_name.charCodeAt(0) % AVATAR_COLORS.length];
-              const ts = TYPE_STYLES[job.job_type] || { bg: 'rgba(107,114,128,0.1)', text: '#6b7280' };
+              const arrStyle = getArrangementStyle(job.work_arrangement);
+              const jtStyle = getJobTypeStyle(job.job_type);
               const dist = locationCenter
                 ? haversineDistance(locationCenter[0], locationCenter[1], job.lat, job.lng)
                 : null;
@@ -238,12 +249,20 @@ export default function MapPage() {
                     </div>
                     <div className="explore-card-info">
                       <span className="explore-card-company">{job.company_name}</span>
-                      <span
-                        className="job-type-badge"
-                        style={{ backgroundColor: ts.bg, color: ts.text, fontSize: '0.65rem', padding: '2px 8px' }}
-                      >
-                        {job.job_type}
-                      </span>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <span
+                          className="job-type-badge"
+                          style={{ backgroundColor: arrStyle.bg, color: arrStyle.text, fontSize: '0.65rem', padding: '2px 8px' }}
+                        >
+                          {job.work_arrangement}
+                        </span>
+                        <span
+                          className="job-type-badge"
+                          style={{ backgroundColor: jtStyle.bg, color: jtStyle.text, fontSize: '0.65rem', padding: '2px 8px' }}
+                        >
+                          {job.job_type}
+                        </span>
+                      </div>
                     </div>
                   </div>
                   <h4 className="explore-card-title">{job.title}</h4>

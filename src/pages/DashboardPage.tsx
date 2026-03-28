@@ -10,6 +10,7 @@ interface Job {
   city: string;
   state: string;
   job_type: string;
+  work_arrangement: string;
   status: string;
   created_at: string;
 }
@@ -41,7 +42,7 @@ export default function DashboardPage() {
   async function loadData() {
     const { data: jobData } = await supabase
       .from('jobs')
-      .select('id, title, city, state, job_type, status, created_at')
+      .select('id, title, city, state, job_type, work_arrangement, status, created_at')
       .eq('employer_id', user!.id)
       .order('created_at', { ascending: false });
 
@@ -173,7 +174,7 @@ export default function DashboardPage() {
                       <div className="dash-job-left">
                         <h3>{job.title}</h3>
                         <span className="dashboard-job-meta">
-                          {job.city}, {job.state} &middot; {job.job_type} &middot; {timeLabel}
+                          {job.city}, {job.state} &middot; {job.work_arrangement} &middot; {job.job_type} &middot; {timeLabel}
                         </span>
                       </div>
                       <div className="dash-job-right">

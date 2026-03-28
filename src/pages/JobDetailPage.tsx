@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, MapPin, DollarSign, Calendar, MapPinned } from 'lucide-react';
 import { supabase } from '../utils/supabase';
+import { getArrangementStyle, getJobTypeStyle } from '../constants/jobStyles';
 import MapView from '../components/MapView';
 
 interface JobTag {
@@ -16,6 +17,7 @@ interface Job {
   requirements: string;
   salary: string;
   job_type: string;
+  work_arrangement: string;
   address: string;
   city: string;
   state: string;
@@ -30,12 +32,6 @@ const AVATAR_COLORS = [
   '#eab308', '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6',
 ];
 
-const TYPE_STYLES: Record<string, { bg: string; text: string }> = {
-  remote: { bg: 'rgba(59,130,246,0.1)', text: '#2563eb' },
-  hybrid: { bg: 'rgba(99,102,241,0.1)', text: '#6366f1' },
-  'in-office': { bg: 'rgba(56,182,83,0.1)', text: '#2d9a46' },
-  contract: { bg: 'rgba(249,115,22,0.1)', text: '#ea580c' },
-};
 
 export default function JobDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -66,7 +62,8 @@ export default function JobDetailPage() {
   const daysAgo = Math.floor((Date.now() - new Date(job.created_at).getTime()) / 86400000);
   const timeLabel = daysAgo === 0 ? 'Today' : daysAgo === 1 ? '1 day ago' : `${daysAgo} days ago`;
   const avatarColor = AVATAR_COLORS[job.company_name.charCodeAt(0) % AVATAR_COLORS.length];
-  const typeStyle = TYPE_STYLES[job.job_type] || { bg: 'rgba(107,114,128,0.1)', text: '#6b7280' };
+  const arrangementStyle = getArrangementStyle(job.work_arrangement);
+  const typeStyle = getJobTypeStyle(job.job_type);
   const tags = job.job_tags?.map((jt) => jt.tags).filter(Boolean) || [];
 
   return (
@@ -87,9 +84,14 @@ export default function JobDetailPage() {
                 <p className="job-detail-company">{job.company_name}</p>
               </div>
             </div>
-            <span className="job-type-badge" style={{ backgroundColor: typeStyle.bg, color: typeStyle.text }}>
-              {job.job_type}
-            </span>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <span className="job-type-badge" style={{ backgroundColor: arrangementStyle.bg, color: arrangementStyle.text }}>
+                {job.work_arrangement}
+              </span>
+              <span className="job-type-badge" style={{ backgroundColor: typeStyle.bg, color: typeStyle.text }}>
+                {job.job_type}
+              </span>
+            </div>
           </div>
 
           <div className="job-detail-meta">

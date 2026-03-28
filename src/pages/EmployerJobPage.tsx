@@ -12,6 +12,7 @@ interface Job {
   state: string;
   salary: string;
   job_type: string;
+  work_arrangement: string;
   status: string;
   description: string;
   requirements: string;
@@ -170,7 +171,7 @@ export default function EmployerJobPage() {
           <h1>{job.title}</h1>
           <div className="ej-header-meta">
             <span><MapPin size={14} /> {job.city}, {job.state}</span>
-            <span>{job.job_type}</span>
+            <span>{job.work_arrangement} &middot; {job.job_type}</span>
             <span>{job.salary}</span>
             <span>Posted {timeLabel}</span>
           </div>

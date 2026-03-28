@@ -1,7 +1,8 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, MapPin, Briefcase, Tag, Map } from 'lucide-react';
+import { Search, MapPin, Briefcase, Map } from 'lucide-react';
 import { supabase } from '../utils/supabase';
+import { ARRANGEMENT_OPTIONS } from '../constants/jobStyles';
 import JobCard from '../components/JobCard';
 
 interface JobTag {
@@ -16,6 +17,7 @@ interface Job {
   description: string;
   salary: string;
   job_type: string;
+  work_arrangement: string;
   city: string;
   state: string;
   status: string;
@@ -37,8 +39,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
-  const [tagFilter, setTagFilter] = useState('');
+  const [arrangementFilter, setArrangementFilter] = useState('');
 
   useEffect(() => {
     Promise.all([fetchJobs(), fetchTags()]).finally(() => setLoading(false));
@@ -75,13 +76,12 @@ export default function HomePage() {
       !locationFilter ||
       job.city.toLowerCase().includes(locationFilter.toLowerCase()) ||
       job.state.toLowerCase().includes(locationFilter.toLowerCase());
-    const matchesType = !typeFilter || job.job_type === typeFilter;
-    const matchesTag = !tagFilter || job.job_tags?.some((jt) => jt.tag_id === tagFilter);
-    return matchesSearch && matchesLocation && matchesType && matchesTag;
-  }), [jobs, search, locationFilter, typeFilter, tagFilter]);
+    const matchesArrangement = !arrangementFilter || job.work_arrangement === arrangementFilter;
+    return matchesSearch && matchesLocation && matchesArrangement;
+  }), [jobs, search, locationFilter, arrangementFilter]);
 
   const featuredJobs = useMemo(() => jobs.filter((j) => j.is_featured), [jobs]);
-  const nonFeatured = useMemo(() => filtered.filter((j) => !j.is_featured || tagFilter || search || locationFilter || typeFilter), [filtered, tagFilter, search, locationFilter, typeFilter]);
+  const nonFeatured = useMemo(() => filtered.filter((j) => !j.is_featured || search || locationFilter || arrangementFilter), [filtered, search, locationFilter, arrangementFilter]);
 
   // Count jobs per tag
   const tagCounts = useMemo(() => {
@@ -131,27 +131,13 @@ export default function HomePage() {
             <div className="hero-search-field">
               <Briefcase size={18} className="hero-search-icon" />
               <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
+                value={arrangementFilter}
+                onChange={(e) => setArrangementFilter(e.target.value)}
                 className="hero-search-select"
               >
-                <option value="">All Types</option>
-                <option value="remote">Remote</option>
-                <option value="hybrid">Hybrid</option>
-                <option value="in-office">In-Office</option>
-                <option value="contract">Contract</option>
-              </select>
-            </div>
-            <div className="hero-search-field">
-              <Tag size={18} className="hero-search-icon" />
-              <select
-                value={tagFilter}
-                onChange={(e) => setTagFilter(e.target.value)}
-                className="hero-search-select"
-              >
-                <option value="">All Categories</option>
-                {tags.map((t) => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
+                <option value="">All</option>
+                {ARRANGEMENT_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
             </div>
@@ -161,7 +147,7 @@ export default function HomePage() {
                 const params = new URLSearchParams();
                 if (search) params.set('q', search);
                 if (locationFilter) params.set('location', locationFilter);
-                if (typeFilter) params.set('type', typeFilter);
+                if (arrangementFilter) params.set('arrangement', arrangementFilter);
                 navigate(`/map${params.toString() ? `?${params}` : ''}`);
               }}
             >
@@ -205,7 +191,7 @@ export default function HomePage() {
 
       <div className="page">
         {/* Featured Jobs */}
-        {featuredJobs.length > 0 && !search && !locationFilter && !typeFilter && !tagFilter && (
+        {featuredJobs.length > 0 && !search && !locationFilter && !arrangementFilter && (
           <div className="featured-section">
             <div className="section-header">
               <h2>Featured Jobs</h2>
@@ -221,6 +207,7 @@ export default function HomePage() {
                   state={job.state}
                   salary={job.salary}
                   jobType={job.job_type}
+                  workArrangement={job.work_arrangement}
                   createdAt={job.created_at}
                   isFeatured
                   tags={getJobTags(job)}
@@ -232,7 +219,7 @@ export default function HomePage() {
 
         {/* Recent / Filtered Jobs */}
         <div className="section-header">
-          <h2>{search || locationFilter || typeFilter || tagFilter ? 'Search Results' : 'Recent Job Listings'}</h2>
+          <h2>{search || locationFilter || arrangementFilter ? 'Search Results' : 'Recent Job Listings'}</h2>
           <span className="results-count">{nonFeatured.length} job{nonFeatured.length !== 1 ? 's' : ''} found</span>
         </div>
 
@@ -266,6 +253,7 @@ export default function HomePage() {
                 state={job.state}
                 salary={job.salary}
                 jobType={job.job_type}
+                workArrangement={job.work_arrangement}
                 createdAt={job.created_at}
                 tags={getJobTags(job)}
               />
