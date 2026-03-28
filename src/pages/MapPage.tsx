@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { Search, MapPin, DollarSign, List, Map } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import { haversineDistance, radiusToZoom } from '../utils/distance';
@@ -138,6 +139,10 @@ export default function MapPage() {
 
   return (
     <div className="explore-page">
+      <Helmet>
+        <title>Search Jobs by Map - Association Careers</title>
+        <meta name="description" content="Search association career opportunities by location on an interactive map. Filter by job type, work arrangement, and category." />
+      </Helmet>
       <div className="explore-mobile-toggle">
         <button
           className={`explore-toggle-btn ${mobileView === 'list' ? 'explore-toggle-active' : ''}`}

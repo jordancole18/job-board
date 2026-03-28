@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { Upload, CheckCircle, FileText } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 
@@ -102,6 +103,10 @@ export default function SubmitResumePage() {
 
   return (
     <div className="page apply-page">
+      <Helmet>
+        <title>Submit Your Resume - Association Careers</title>
+        <meta name="description" content="Submit your resume confidentially to be considered for association career opportunities across the United States." />
+      </Helmet>
       <div className="submit-resume-header">
         <div className="submit-resume-icon">
           <FileText size={32} />

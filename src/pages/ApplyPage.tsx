@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, MapPin, DollarSign, Upload, CheckCircle } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 
@@ -150,6 +151,10 @@ export default function ApplyPage() {
 
   return (
     <div className="page apply-page">
+      <Helmet>
+        <title>Apply - {job.title} at {job.company_name} - Association Careers</title>
+        <meta name="robots" content="noindex" />
+      </Helmet>
       <Link to={`/jobs/${id}`} className="back-link">
         <ArrowLeft size={16} /> Back to job details
       </Link>

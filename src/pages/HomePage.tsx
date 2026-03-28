@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { Search, MapPin, Briefcase, Map } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import { ARRANGEMENT_OPTIONS } from '../constants/jobStyles';
@@ -100,6 +101,10 @@ export default function HomePage() {
 
   return (
     <>
+      <Helmet>
+        <title>Association Careers - Find Your Next Opportunity</title>
+        <meta name="description" content={`Browse ${jobs.length} open positions at realtor associations across the United States. CEO, marketing, communications, government affairs, and more.`} />
+      </Helmet>
       <section className="hero">
         <div className="hero-content">
           <span className="hero-badge">Trusted by realtor associations nationwide</span>

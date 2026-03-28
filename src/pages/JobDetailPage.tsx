@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, MapPin, DollarSign, Calendar, MapPinned } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import { getArrangementStyle, getJobTypeStyle } from '../constants/jobStyles';
@@ -66,8 +67,48 @@ export default function JobDetailPage() {
   const typeStyle = getJobTypeStyle(job.job_type);
   const tags = job.job_tags?.map((jt) => jt.tags).filter(Boolean) || [];
 
+  const employmentTypeMap: Record<string, string> = {
+    'full-time': 'FULL_TIME', 'part-time': 'PART_TIME', contract: 'CONTRACTOR',
+  };
+  const jobLocationTypeMap: Record<string, string> = {
+    remote: 'TELECOMMUTE', hybrid: 'TELECOMMUTE', 'on-site': '',
+  };
+
+  const jsonLd = {
+    '@context': 'https://schema.org/',
+    '@type': 'JobPosting',
+    title: job.title,
+    description: job.description,
+    datePosted: job.created_at,
+    hiringOrganization: {
+      '@type': 'Organization',
+      name: job.company_name,
+    },
+    jobLocation: {
+      '@type': 'Place',
+      address: {
+        '@type': 'PostalAddress',
+        addressLocality: job.city,
+        addressRegion: job.state,
+        addressCountry: 'US',
+        ...(job.address ? { streetAddress: job.address } : {}),
+      },
+    },
+    ...(employmentTypeMap[job.job_type] ? { employmentType: employmentTypeMap[job.job_type] } : {}),
+    ...(jobLocationTypeMap[job.work_arrangement] ? { jobLocationType: jobLocationTypeMap[job.work_arrangement] } : {}),
+    ...(job.salary ? { baseSalary: { '@type': 'MonetaryAmount', currency: 'USD', value: { '@type': 'QuantitativeValue', value: job.salary } } } : {}),
+  };
+
   return (
     <div className="page">
+      <Helmet>
+        <title>{job.title} at {job.company_name} - Association Careers</title>
+        <meta name="description" content={`${job.title} position at ${job.company_name} in ${job.city}, ${job.state}. ${job.salary}. ${job.work_arrangement} / ${job.job_type}.`} />
+        <meta property="og:title" content={`${job.title} at ${job.company_name}`} />
+        <meta property="og:description" content={`${job.work_arrangement} ${job.job_type} position in ${job.city}, ${job.state}. ${job.salary}.`} />
+        <meta property="og:type" content="article" />
+        <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
+      </Helmet>
       <Link to="/" className="back-link">
         <ArrowLeft size={16} /> Back to jobs
       </Link>
