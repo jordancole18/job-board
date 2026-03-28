@@ -859,7 +859,7 @@ select.input { cursor: pointer; appearance: auto; }
   display: grid;
   grid-template-columns: 1fr 400px;
   gap: 28px;
-  align-items: start;
+  align-items: stretch;
   animation: fadeInUp 0.4s ease-out;
 }
 
@@ -979,6 +979,13 @@ select.input { cursor: pointer; appearance: auto; }
   box-shadow: var(--shadow-md);
   position: sticky;
   top: 88px;
+  display: flex;
+  flex-direction: column;
+}
+
+.job-detail-sidebar .leaflet-container {
+  flex: 1;
+  min-height: 250px;
 }
 
 .job-detail-sidebar h3 {
