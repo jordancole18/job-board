@@ -73,17 +73,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return;
 
     async function ensureEmployerAndLoad() {
+      console.log('[AuthContext] ensureEmployerAndLoad for user:', user!.id);
+      console.log('[AuthContext] user_metadata:', JSON.stringify(user!.user_metadata));
+
       // Check if employer record already exists
-      const { data: existing } = await supabase
+      const { data: existing, error: selectError } = await supabase
         .from('employers')
         .select('id')
         .eq('user_id', user!.id)
         .maybeSingle();
 
+      console.log('[AuthContext] Existing employer:', existing, 'selectError:', selectError?.message);
+
       if (!existing) {
         // No employer record — create one from auth metadata
         const meta = user!.user_metadata;
         const company = meta?.company_name;
+        console.log('[AuthContext] Company from metadata:', company);
 
         if (company) {
           console.log('[AuthContext] Creating employer record for:', company);
@@ -97,7 +103,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           if (error) {
             console.error('[AuthContext] Employer insert failed:', error.message);
+          } else {
+            console.log('[AuthContext] Employer record created successfully');
           }
+        } else {
+          console.warn('[AuthContext] No company_name in user metadata — cannot create employer record');
         }
       }
 
