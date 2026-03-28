@@ -4,6 +4,7 @@ import { ArrowLeft, Eye, Users, Clock, Download, Trash2, MapPin, ChevronLeft, Ch
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabase';
 import { JOB_TYPE_OPTIONS, ARRANGEMENT_OPTIONS } from '../constants/jobStyles';
+import { US_STATES } from '../constants/usStates';
 
 interface Job {
   id: string;
@@ -254,7 +255,12 @@ export default function EmployerJobPage() {
             </div>
             <div className="form-group">
               <label>State</label>
-              <input className="input" value={editForm.state} onChange={(e) => setEditForm((f) => ({ ...f, state: e.target.value }))} />
+              <select className="input" value={editForm.state} onChange={(e) => setEditForm((f) => ({ ...f, state: e.target.value }))}>
+                <option value="">Select state...</option>
+                {US_STATES.map((s) => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+              </select>
             </div>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>

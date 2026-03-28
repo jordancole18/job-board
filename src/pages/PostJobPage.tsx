@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabase';
 import { geocodeAddress, normalizeState } from '../utils/geocode';
 import { JOB_TYPE_OPTIONS, ARRANGEMENT_OPTIONS } from '../constants/jobStyles';
+import { US_STATES } from '../constants/usStates';
 
 interface TagOption {
   id: string;
@@ -212,7 +213,12 @@ export default function PostJobPage() {
             </div>
             <div className="form-group">
               <label>State</label>
-              <input className="input" required value={form.state} onChange={(e) => update('state', e.target.value)} placeholder="CA" />
+              <select className="input" required value={form.state} onChange={(e) => update('state', e.target.value)}>
+                <option value="">Select state...</option>
+                {US_STATES.map((s) => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+              </select>
             </div>
           </div>
 

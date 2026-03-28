@@ -4,6 +4,7 @@ import { Tag, FileText, Star, Plus, Trash2, Download, Eye, Pencil, Check, X, Use
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabase';
 import { JOB_TYPE_OPTIONS, ARRANGEMENT_OPTIONS } from '../constants/jobStyles';
+import { US_STATES } from '../constants/usStates';
 
 interface TagItem {
   id: string;
@@ -628,7 +629,12 @@ export default function AdminPage() {
                         </div>
                         <div className="form-group">
                           <label>State</label>
-                          <input className="input" value={editJobForm.state} onChange={(e) => setEditJobForm((f) => ({ ...f, state: e.target.value }))} />
+                          <select className="input" value={editJobForm.state} onChange={(e) => setEditJobForm((f) => ({ ...f, state: e.target.value }))}>
+                            <option value="">Select state...</option>
+                            {US_STATES.map((s) => (
+                              <option key={s.value} value={s.value}>{s.label}</option>
+                            ))}
+                          </select>
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
