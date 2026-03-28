@@ -2,6 +2,16 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../utils/supabase';
 
+const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
+
+function notifyNewEmployer(companyName: string, email: string) {
+  fetch(`${FUNCTIONS_URL}/notify-new-employer`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ companyName, email }),
+  }).catch(() => {});
+}
+
 interface AuthState {
   session: Session | null;
   user: User | null;
@@ -65,10 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setCompanyName(pendingCompany);
           setIsAdmin(false);
           setIsApproved(false);
-          // Notify admin of new employer (fire-and-forget)
-          supabase.functions.invoke('notify-new-employer', {
-            body: { companyName: pendingCompany, email: pendingEmail || user.email },
-          }).catch(() => {});
+          notifyNewEmployer(pendingCompany, pendingEmail || user.email || '');
         });
     } else {
       fetchEmployerInfo(user.id);
@@ -102,10 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .insert({ user_id: data.user!.id, company_name: company });
       if (insertError) return insertError.message;
       setCompanyName(company);
-      // Notify admin of new employer (fire-and-forget)
-      supabase.functions.invoke('notify-new-employer', {
-        body: { companyName: company, email },
-      }).catch(() => {});
+      notifyNewEmployer(company, email);
     } else if (data.user) {
       localStorage.setItem('pending_company_name', company);
       localStorage.setItem('pending_employer_email', email);
