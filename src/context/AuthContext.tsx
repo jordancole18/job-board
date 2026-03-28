@@ -2,7 +2,6 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../utils/supabase';
 
-
 interface AuthState {
   session: Session | null;
   user: User | null;
@@ -26,9 +25,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   // Step 1: Listen for auth changes — NEVER make DB calls inside this callback.
-  // Supabase JS v2.64+ runs these callbacks inside an internal auth lock;
-  // any supabase.from() call tries to re-acquire that lock → deadlock → every
-  // query in the app hangs forever.
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -71,48 +67,66 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // Step 2: Fetch employer info in a SEPARATE effect, outside the auth lock.
+  // Step 2: When we have a user, ensure their employer record exists, then load it.
   useEffect(() => {
-    if (loading) return; // wait for auth to initialise first
+    if (loading) return;
     if (!user) return;
 
-    const pendingCompany = localStorage.getItem('pending_company_name');
-    const pendingEmail = localStorage.getItem('pending_employer_email');
-    if (pendingCompany) {
-      localStorage.removeItem('pending_company_name');
-      localStorage.removeItem('pending_employer_email');
-      console.log('[AuthContext] Creating employer record for:', pendingCompany);
-      supabase
+    async function ensureEmployerAndLoad() {
+      // Check if employer record already exists
+      const { data: existing } = await supabase
         .from('employers')
-        .insert({ user_id: user.id, company_name: pendingCompany, email: pendingEmail || user.email })
-        .then(({ error }) => {
+        .select('id')
+        .eq('user_id', user!.id)
+        .maybeSingle();
+
+      if (!existing) {
+        // No employer record — create one from auth metadata
+        const meta = user!.user_metadata;
+        const company = meta?.company_name;
+
+        if (company) {
+          console.log('[AuthContext] Creating employer record for:', company);
+          const { error } = await supabase
+            .from('employers')
+            .insert({
+              user_id: user!.id,
+              company_name: company,
+              email: user!.email,
+            });
+
           if (error) {
             console.error('[AuthContext] Employer insert failed:', error.message);
-            fetchEmployerInfo(user.id);
-            return;
           }
-          console.log('[AuthContext] Employer created, sending notification');
-          setCompanyName(pendingCompany);
-          setIsAdmin(false);
-          setIsApproved(false);
-        });
-    } else {
-      fetchEmployerInfo(user.id);
+        }
+      }
+
+      // Now load the employer info
+      await fetchEmployerInfo(user!.id);
     }
+
+    ensureEmployerAndLoad();
   }, [user?.id, loading]);
 
   async function signUp(email: string, password: string, company: string): Promise<string | null> {
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    // Store company_name in auth user metadata so it survives email confirmation
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { company_name: company } },
+    });
     if (error) return error.message;
+
     if (data.session) {
+      // Immediate session — create employer record now
       const { error: insertError } = await supabase
         .from('employers')
         .insert({ user_id: data.user!.id, company_name: company, email });
       if (insertError) return insertError.message;
       setCompanyName(company);
     } else if (data.user) {
-      localStorage.setItem('pending_company_name', company);
-      localStorage.setItem('pending_employer_email', email);
+      // Email confirmation required — metadata is stored on the user,
+      // employer record will be created when they confirm and the useEffect runs
       return 'check_email';
     }
     return null;
