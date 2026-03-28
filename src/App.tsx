@@ -11,6 +11,7 @@ import DashboardPage from './pages/DashboardPage';
 import EmployerJobPage from './pages/EmployerJobPage';
 import SubmitResumePage from './pages/SubmitResumePage';
 import AdminPage from './pages/AdminPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
           <Route path="/employer/jobs/:id" element={<EmployerJobPage />} />
           <Route path="/submit-resume" element={<SubmitResumePage />} />
           <Route path="/admin" element={<AdminPage />} />
+          <Route path="/auth/reset" element={<ResetPasswordPage />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

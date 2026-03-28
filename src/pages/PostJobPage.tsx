@@ -13,7 +13,7 @@ interface TagOption {
 }
 
 export default function PostJobPage() {
-  const { user, companyName, isApproved, loading: authLoading } = useAuth();
+  const { user, companyName, isAdmin, isApproved, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -26,6 +26,7 @@ export default function PostJobPage() {
     salary: '',
     jobType: 'full-time' as string,
     workArrangement: 'on-site' as string,
+    companyNameOverride: '',
     address: '',
     city: '',
     state: '',
@@ -65,9 +66,13 @@ export default function PostJobPage() {
       return;
     }
 
+    const jobCompanyName = isAdmin && form.companyNameOverride.trim()
+      ? form.companyNameOverride.trim()
+      : companyName;
+
     const { data: jobData, error: insertError } = await supabase.from('jobs').insert({
       employer_id: user!.id,
-      company_name: companyName,
+      company_name: jobCompanyName,
       title: form.title,
       description: form.description,
       requirements: form.requirements,
@@ -129,6 +134,14 @@ export default function PostJobPage() {
 
       <div className="form-card">
         <form onSubmit={handleSubmit}>
+          {isAdmin && (
+            <div className="form-group">
+              <label>Company Name</label>
+              <input className="input" value={form.companyNameOverride} onChange={(e) => update('companyNameOverride', e.target.value)} placeholder={companyName || 'Leave blank to use your company name'} />
+              <p className="form-hint">Admin: enter any company name, or leave blank to use yours.</p>
+            </div>
+          )}
+
           <div className="form-group">
             <label>Job Title</label>
             <input className="input" required value={form.title} onChange={(e) => update('title', e.target.value)} placeholder="e.g. Government Affairs Director" />

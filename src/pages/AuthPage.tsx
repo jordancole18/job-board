@@ -1,16 +1,18 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Briefcase, Mail } from 'lucide-react';
+import { Briefcase, Mail, KeyRound } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../utils/supabase';
 
 export default function AuthPage() {
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [checkEmail, setCheckEmail] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
   const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
 
@@ -19,7 +21,20 @@ export default function AuthPage() {
     setError('');
     setLoading(true);
 
-    if (isSignUp) {
+    if (mode === 'forgot') {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/reset`,
+      });
+      setLoading(false);
+      if (error) {
+        setError(error.message);
+        return;
+      }
+      setResetSent(true);
+      return;
+    }
+
+    if (mode === 'signup') {
       if (!companyName.trim()) {
         setError('Company name is required');
         setLoading(false);
@@ -63,8 +78,31 @@ export default function AuthPage() {
           </div>
           <p style={{ color: '#6b7280', fontSize: '0.875rem', marginTop: '1.5rem' }}>
             Didn't receive it? Check your spam folder or{' '}
-            <button onClick={() => { setCheckEmail(false); setIsSignUp(true); }} className="link-btn">
+            <button onClick={() => { setCheckEmail(false); setMode('signup'); }} className="link-btn">
               try again
+            </button>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (resetSent) {
+    return (
+      <div className="page auth-page">
+        <div className="auth-card" style={{ textAlign: 'center' }}>
+          <div className="auth-header">
+            <div style={{ width: 52, height: 52, borderRadius: 16, backgroundColor: '#38b653', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}>
+              <KeyRound size={24} color="white" />
+            </div>
+            <h2>Check your email</h2>
+            <p className="auth-subtitle">
+              We sent a password reset link to <strong>{email}</strong>. Click the link to set a new password.
+            </p>
+          </div>
+          <p style={{ color: '#6b7280', fontSize: '0.875rem', marginTop: '1.5rem' }}>
+            <button onClick={() => { setResetSent(false); setMode('signin'); setError(''); }} className="link-btn">
+              Back to sign in
             </button>
           </p>
         </div>
@@ -82,14 +120,14 @@ export default function AuthPage() {
               <Briefcase x="14" y="14" width="24" height="24" color="white" strokeWidth={1.5} />
             </svg>
           </div>
-          <h2>{isSignUp ? 'Create your account' : 'Welcome back'}</h2>
+          <h2>{mode === 'signup' ? 'Create your account' : mode === 'forgot' ? 'Reset your password' : 'Welcome back'}</h2>
           <p className="auth-subtitle">
-            {isSignUp ? 'Start posting jobs in minutes' : 'Sign in to manage your job postings'}
+            {mode === 'signup' ? 'Start posting jobs in minutes' : mode === 'forgot' ? 'Enter your email and we\'ll send a reset link' : 'Sign in to manage your job postings'}
           </p>
         </div>
 
         <form onSubmit={handleSubmit}>
-          {isSignUp && (
+          {mode === 'signup' && (
             <div className="form-group">
               <label>Company Name</label>
               <input
@@ -113,30 +151,40 @@ export default function AuthPage() {
               required
             />
           </div>
-          <div className="form-group">
-            <label>Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="input"
-              placeholder="Min 6 characters"
-              minLength={6}
-              required
-            />
-          </div>
+          {mode !== 'forgot' && (
+            <div className="form-group">
+              <label>Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="input"
+                placeholder="Min 6 characters"
+                minLength={6}
+                required
+              />
+            </div>
+          )}
           {error && <p className="error-text">{error}</p>}
           <button type="submit" className="btn btn-primary btn-full" disabled={loading}>
-            {loading ? 'Please wait...' : isSignUp ? 'Create Account' : 'Sign In'}
+            {loading ? 'Please wait...' : mode === 'signup' ? 'Create Account' : mode === 'forgot' ? 'Send Reset Link' : 'Sign In'}
           </button>
         </form>
+
+        {mode === 'signin' && (
+          <p style={{ textAlign: 'center', marginTop: '0.75rem' }}>
+            <button onClick={() => { setMode('forgot'); setError(''); }} className="link-btn" style={{ fontSize: '0.875rem' }}>
+              Forgot your password?
+            </button>
+          </p>
+        )}
 
         <div className="auth-divider"><span>or</span></div>
 
         <p className="auth-toggle">
-          {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
-          <button onClick={() => { setIsSignUp(!isSignUp); setError(''); }} className="link-btn">
-            {isSignUp ? 'Sign In' : 'Sign Up'}
+          {mode === 'signup' ? 'Already have an account?' : "Don't have an account?"}{' '}
+          <button onClick={() => { setMode(mode === 'signup' ? 'signin' : 'signup'); setError(''); }} className="link-btn">
+            {mode === 'signup' ? 'Sign In' : 'Sign Up'}
           </button>
         </p>
       </div>
