@@ -54,8 +54,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return;
 
     const pendingCompany = localStorage.getItem('pending_company_name');
+    const pendingEmail = localStorage.getItem('pending_employer_email');
     if (pendingCompany) {
       localStorage.removeItem('pending_company_name');
+      localStorage.removeItem('pending_employer_email');
       supabase
         .from('employers')
         .insert({ user_id: user.id, company_name: pendingCompany })
@@ -63,6 +65,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setCompanyName(pendingCompany);
           setIsAdmin(false);
           setIsApproved(false);
+          // Notify admin of new employer (fire-and-forget)
+          supabase.functions.invoke('notify-new-employer', {
+            body: { companyName: pendingCompany, email: pendingEmail || user.email },
+          }).catch(() => {});
         });
     } else {
       fetchEmployerInfo(user.id);
@@ -96,8 +102,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .insert({ user_id: data.user!.id, company_name: company });
       if (insertError) return insertError.message;
       setCompanyName(company);
+      // Notify admin of new employer (fire-and-forget)
+      supabase.functions.invoke('notify-new-employer', {
+        body: { companyName: company, email },
+      }).catch(() => {});
     } else if (data.user) {
       localStorage.setItem('pending_company_name', company);
+      localStorage.setItem('pending_employer_email', email);
     }
     return null;
   }

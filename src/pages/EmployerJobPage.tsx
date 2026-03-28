@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Eye, Users, Clock, Download, Trash2, MapPin, ChevronLeft, ChevronRight, Star, Mail, X } from 'lucide-react';
+import { ArrowLeft, Eye, Users, Clock, Download, Trash2, MapPin, ChevronLeft, ChevronRight, Star, Mail, X, Pencil } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabase';
+import { JOB_TYPE_OPTIONS, ARRANGEMENT_OPTIONS } from '../constants/jobStyles';
 
 interface Job {
   id: string;
   title: string;
   company_name: string;
+  address: string;
   city: string;
   state: string;
   salary: string;
@@ -63,6 +65,12 @@ export default function EmployerJobPage() {
   const [activeAppIndex, setActiveAppIndex] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState('');
   const [ratingFilter, setRatingFilter] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    title: '', description: '', requirements: '', salary: '',
+    job_type: '', work_arrangement: '', address: '', city: '', state: '',
+  });
+  const [editLoading, setEditLoading] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -108,6 +116,38 @@ export default function EmployerJobPage() {
   async function updateJobStatus(status: string) {
     await supabase.from('jobs').update({ status }).eq('id', id);
     setJob((prev) => prev ? { ...prev, status } : prev);
+  }
+
+  function startEditing() {
+    if (!job) return;
+    setEditForm({
+      title: job.title, description: job.description, requirements: job.requirements,
+      salary: job.salary, job_type: job.job_type, work_arrangement: job.work_arrangement,
+      address: job.address || '', city: job.city, state: job.state,
+    });
+    setEditing(true);
+  }
+
+  async function saveEdit() {
+    setEditLoading(true);
+    const { error } = await supabase.from('jobs').update({
+      title: editForm.title,
+      description: editForm.description,
+      requirements: editForm.requirements,
+      salary: editForm.salary,
+      job_type: editForm.job_type,
+      work_arrangement: editForm.work_arrangement,
+      address: editForm.address,
+      city: editForm.city,
+      state: editForm.state,
+    }).eq('id', id);
+    setEditLoading(false);
+    if (error) {
+      alert('Failed to save: ' + error.message);
+      return;
+    }
+    setJob((prev) => prev ? { ...prev, ...editForm } : prev);
+    setEditing(false);
   }
 
   async function updateAppStatus(appId: string, status: string) {
@@ -166,31 +206,94 @@ export default function EmployerJobPage() {
         <ArrowLeft size={16} /> Back to Dashboard
       </Link>
 
-      <div className="ej-header">
-        <div className="ej-header-left">
-          <h1>{job.title}</h1>
-          <div className="ej-header-meta">
-            <span><MapPin size={14} /> {job.city}, {job.state}</span>
-            <span>{job.work_arrangement} &middot; {job.job_type}</span>
-            <span>{job.salary}</span>
-            <span>Posted {timeLabel}</span>
+      {editing ? (
+        <div className="form-card" style={{ marginBottom: '1.5rem' }}>
+          <h2 style={{ marginBottom: '1rem' }}>Edit Job Posting</h2>
+          <div className="form-group">
+            <label>Job Title</label>
+            <input className="input" value={editForm.title} onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))} />
+          </div>
+          <div className="form-group">
+            <label>Description</label>
+            <textarea className="input textarea" value={editForm.description} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))} rows={5} />
+          </div>
+          <div className="form-group">
+            <label>Requirements</label>
+            <textarea className="input textarea" value={editForm.requirements} onChange={(e) => setEditForm((f) => ({ ...f, requirements: e.target.value }))} rows={3} />
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Salary Range</label>
+              <input className="input" value={editForm.salary} onChange={(e) => setEditForm((f) => ({ ...f, salary: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label>Job Type</label>
+              <select className="input" value={editForm.job_type} onChange={(e) => setEditForm((f) => ({ ...f, job_type: e.target.value }))}>
+                {JOB_TYPE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Work Arrangement</label>
+              <select className="input" value={editForm.work_arrangement} onChange={(e) => setEditForm((f) => ({ ...f, work_arrangement: e.target.value }))}>
+                {ARRANGEMENT_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="form-group">
+            <label>Street Address</label>
+            <input className="input" value={editForm.address} onChange={(e) => setEditForm((f) => ({ ...f, address: e.target.value }))} />
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label>City</label>
+              <input className="input" value={editForm.city} onChange={(e) => setEditForm((f) => ({ ...f, city: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label>State</label>
+              <input className="input" value={editForm.state} onChange={(e) => setEditForm((f) => ({ ...f, state: e.target.value }))} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+            <button className="btn btn-primary" onClick={saveEdit} disabled={editLoading}>
+              {editLoading ? 'Saving...' : 'Save Changes'}
+            </button>
+            <button className="btn btn-outline" onClick={() => setEditing(false)}>Cancel</button>
           </div>
         </div>
-        <div className="ej-header-actions">
-          <select
-            value={job.status}
-            onChange={(e) => updateJobStatus(e.target.value)}
-            className="status-select"
-          >
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-            <option value="filled">Filled</option>
-          </select>
-          <button onClick={handleDelete} className="btn btn-danger">
-            <Trash2 size={14} /> Delete Job
-          </button>
+      ) : (
+        <div className="ej-header">
+          <div className="ej-header-left">
+            <h1>{job.title}</h1>
+            <div className="ej-header-meta">
+              <span><MapPin size={14} /> {job.city}, {job.state}</span>
+              <span>{job.work_arrangement} &middot; {job.job_type}</span>
+              <span>{job.salary}</span>
+              <span>Posted {timeLabel}</span>
+            </div>
+          </div>
+          <div className="ej-header-actions">
+            <button onClick={startEditing} className="btn btn-outline">
+              <Pencil size={14} /> Edit
+            </button>
+            <select
+              value={job.status}
+              onChange={(e) => updateJobStatus(e.target.value)}
+              className="status-select"
+            >
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="filled">Filled</option>
+            </select>
+            <button onClick={handleDelete} className="btn btn-danger">
+              <Trash2 size={14} /> Delete Job
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="ej-stats">
         <div className="stat-card">

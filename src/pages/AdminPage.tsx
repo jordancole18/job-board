@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Tag, FileText, Star, Plus, Trash2, Download, Eye, Pencil, Check, X, Users, ShieldCheck, ShieldX, Crown, Briefcase } from 'lucide-react';
+import { Tag, FileText, Star, Plus, Trash2, Download, Eye, Pencil, Check, X, Users, ShieldCheck, ShieldX, Crown, Briefcase, Settings } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabase';
+import { JOB_TYPE_OPTIONS, ARRANGEMENT_OPTIONS } from '../constants/jobStyles';
 
 interface TagItem {
   id: string;
@@ -27,6 +28,10 @@ interface AdminJob {
   id: string;
   title: string;
   company_name: string;
+  description: string;
+  requirements: string;
+  salary: string;
+  address: string;
   city: string;
   state: string;
   job_type: string;
@@ -53,7 +58,7 @@ const AVATAR_COLORS = [
 export default function AdminPage() {
   const { user, isAdmin, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'tags' | 'submissions' | 'jobs' | 'employers'>('employers');
+  const [activeTab, setActiveTab] = useState<'tags' | 'submissions' | 'jobs' | 'employers' | 'settings'>('employers');
 
   // Tags state
   const [tags, setTags] = useState<TagItem[]>([]);
@@ -73,6 +78,17 @@ export default function AdminPage() {
   // Employers state
   const [employers, setEmployers] = useState<Employer[]>([]);
 
+  // Job editing state
+  const [editingJobId, setEditingJobId] = useState<string | null>(null);
+  const [editJobForm, setEditJobForm] = useState({
+    title: '', description: '', requirements: '', salary: '',
+    job_type: '', work_arrangement: '', address: '', city: '', state: '',
+  });
+
+  // Settings state
+  const [notificationEmail, setNotificationEmail] = useState('');
+  const [settingsSaved, setSettingsSaved] = useState(false);
+
   useEffect(() => {
     if (authLoading) return;
     if (!user || !isAdmin) {
@@ -83,6 +99,7 @@ export default function AdminPage() {
     loadSubmissions();
     loadJobs();
     loadEmployers();
+    loadSettings();
   }, [user, isAdmin, authLoading]);
 
   async function loadTags() {
@@ -102,7 +119,7 @@ export default function AdminPage() {
   async function loadJobs() {
     const { data } = await supabase
       .from('jobs')
-      .select('id, title, company_name, city, state, job_type, work_arrangement, is_featured, status, created_at')
+      .select('*')
       .order('created_at', { ascending: false });
     if (data) setAllJobs(data);
   }
@@ -174,6 +191,40 @@ export default function AdminPage() {
   }
 
 
+  async function updateJobStatus(jobId: string, status: string) {
+    await supabase.from('jobs').update({ status }).eq('id', jobId);
+    setAllJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, status } : j));
+  }
+
+  function startEditingJob(job: AdminJob) {
+    setEditJobForm({
+      title: job.title, description: job.description, requirements: job.requirements,
+      salary: job.salary, job_type: job.job_type, work_arrangement: job.work_arrangement,
+      address: job.address || '', city: job.city, state: job.state,
+    });
+    setEditingJobId(job.id);
+  }
+
+  async function saveJobEdit(jobId: string) {
+    const { error } = await supabase.from('jobs').update({
+      title: editJobForm.title,
+      description: editJobForm.description,
+      requirements: editJobForm.requirements,
+      salary: editJobForm.salary,
+      job_type: editJobForm.job_type,
+      work_arrangement: editJobForm.work_arrangement,
+      address: editJobForm.address,
+      city: editJobForm.city,
+      state: editJobForm.state,
+    }).eq('id', jobId);
+    if (error) {
+      alert('Failed to save: ' + error.message);
+      return;
+    }
+    setAllJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, ...editJobForm } : j));
+    setEditingJobId(null);
+  }
+
   async function downloadFile(storagePath: string) {
     const { data, error } = await supabase.storage
       .from('applications')
@@ -183,6 +234,24 @@ export default function AdminPage() {
       return;
     }
     window.open(data.signedUrl, '_blank');
+  }
+
+  async function loadSettings() {
+    const { data } = await supabase
+      .from('site_settings')
+      .select('value')
+      .eq('key', 'approval_notification_email')
+      .single();
+    if (data) setNotificationEmail(data.value);
+  }
+
+  async function saveNotificationEmail() {
+    await supabase
+      .from('site_settings')
+      .update({ value: notificationEmail, updated_at: new Date().toISOString() })
+      .eq('key', 'approval_notification_email');
+    setSettingsSaved(true);
+    setTimeout(() => setSettingsSaved(false), 2000);
   }
 
   if (authLoading || !user || !isAdmin) return <div className="page"><div className="loading">Loading...</div></div>;
@@ -223,6 +292,12 @@ export default function AdminPage() {
         >
           <Briefcase size={16} /> Job Postings
           {allJobs.length > 0 && <span className="tab-badge">{allJobs.length}</span>}
+        </button>
+        <button
+          className={`dashboard-tab ${activeTab === 'settings' ? 'dashboard-tab-active' : ''}`}
+          onClick={() => setActiveTab('settings')}
+        >
+          <Settings size={16} /> Settings
         </button>
       </div>
 
@@ -434,35 +509,135 @@ export default function AdminPage() {
             <div className="admin-featured-list">
               {allJobs.map((job) => (
                 <div key={job.id} className={`admin-featured-item ${job.is_featured ? 'admin-featured-active' : ''}`}>
-                  <div className="admin-featured-info">
-                    <h4>{job.title}</h4>
-                    <span className="text-muted">
-                      {job.company_name} &middot; {job.city}, {job.state} &middot; {job.work_arrangement} &middot; {job.job_type} &middot; Posted {new Date(job.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <div className="admin-featured-actions">
-                    <span className={`status-badge ${job.status === 'active' ? '' : 'status-badge-muted'}`}
-                      style={job.status === 'active' ? { backgroundColor: 'rgba(56,182,83,0.1)', color: '#2d9a46' } : { backgroundColor: 'rgba(107,114,128,0.1)', color: '#6b7280' }}
-                    >
-                      {job.status}
-                    </span>
-                    <button
-                      className={`btn btn-sm ${job.is_featured ? 'btn-primary' : 'btn-outline'}`}
-                      onClick={() => toggleFeatured(job.id, job.is_featured)}
-                    >
-                      <Star size={14} /> {job.is_featured ? 'Featured' : 'Feature'}
-                    </button>
-                    <button
-                      className="btn btn-sm btn-danger"
-                      onClick={() => deleteJob(job.id)}
-                    >
-                      <Trash2 size={14} /> Delete
-                    </button>
-                  </div>
+                  {editingJobId === job.id ? (
+                    <div style={{ width: '100%' }}>
+                      <div className="form-group">
+                        <label>Title</label>
+                        <input className="input" value={editJobForm.title} onChange={(e) => setEditJobForm((f) => ({ ...f, title: e.target.value }))} />
+                      </div>
+                      <div className="form-group">
+                        <label>Description</label>
+                        <textarea className="input textarea" value={editJobForm.description} onChange={(e) => setEditJobForm((f) => ({ ...f, description: e.target.value }))} rows={3} />
+                      </div>
+                      <div className="form-group">
+                        <label>Requirements</label>
+                        <textarea className="input textarea" value={editJobForm.requirements} onChange={(e) => setEditJobForm((f) => ({ ...f, requirements: e.target.value }))} rows={2} />
+                      </div>
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label>Salary</label>
+                          <input className="input" value={editJobForm.salary} onChange={(e) => setEditJobForm((f) => ({ ...f, salary: e.target.value }))} />
+                        </div>
+                        <div className="form-group">
+                          <label>Job Type</label>
+                          <select className="input" value={editJobForm.job_type} onChange={(e) => setEditJobForm((f) => ({ ...f, job_type: e.target.value }))}>
+                            {JOB_TYPE_OPTIONS.map((opt) => (
+                              <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>Work Arrangement</label>
+                          <select className="input" value={editJobForm.work_arrangement} onChange={(e) => setEditJobForm((f) => ({ ...f, work_arrangement: e.target.value }))}>
+                            {ARRANGEMENT_OPTIONS.map((opt) => (
+                              <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label>Address</label>
+                          <input className="input" value={editJobForm.address} onChange={(e) => setEditJobForm((f) => ({ ...f, address: e.target.value }))} />
+                        </div>
+                        <div className="form-group">
+                          <label>City</label>
+                          <input className="input" value={editJobForm.city} onChange={(e) => setEditJobForm((f) => ({ ...f, city: e.target.value }))} />
+                        </div>
+                        <div className="form-group">
+                          <label>State</label>
+                          <input className="input" value={editJobForm.state} onChange={(e) => setEditJobForm((f) => ({ ...f, state: e.target.value }))} />
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                        <button className="btn btn-sm btn-primary" onClick={() => saveJobEdit(job.id)}>
+                          <Check size={14} /> Save
+                        </button>
+                        <button className="btn btn-sm btn-outline" onClick={() => setEditingJobId(null)}>
+                          <X size={14} /> Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="admin-featured-info">
+                        <h4>{job.title}</h4>
+                        <span className="text-muted">
+                          {job.company_name} &middot; {job.city}, {job.state} &middot; {job.work_arrangement} &middot; {job.job_type} &middot; Posted {new Date(job.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <div className="admin-featured-actions">
+                        <select
+                          value={job.status}
+                          onChange={(e) => updateJobStatus(job.id, e.target.value)}
+                          className="filter-select"
+                          style={job.status === 'active' ? { backgroundColor: 'rgba(56,182,83,0.1)', color: '#2d9a46' } : { backgroundColor: 'rgba(107,114,128,0.1)', color: '#6b7280' }}
+                        >
+                          <option value="active">Active</option>
+                          <option value="inactive">Inactive</option>
+                          <option value="filled">Filled</option>
+                        </select>
+                        <button
+                          className={`btn btn-sm ${job.is_featured ? 'btn-primary' : 'btn-outline'}`}
+                          onClick={() => toggleFeatured(job.id, job.is_featured)}
+                        >
+                          <Star size={14} /> {job.is_featured ? 'Featured' : 'Feature'}
+                        </button>
+                        <button
+                          className="btn btn-sm btn-outline"
+                          onClick={() => startEditingJob(job)}
+                        >
+                          <Pencil size={14} /> Edit
+                        </button>
+                        <button
+                          className="btn btn-sm btn-danger"
+                          onClick={() => deleteJob(job.id)}
+                        >
+                          <Trash2 size={14} /> Delete
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Settings */}
+      {activeTab === 'settings' && (
+        <div className="admin-section">
+          <h3 style={{ marginBottom: '1rem' }}>Notification Settings</h3>
+          <div className="form-card">
+            <div className="form-group">
+              <label>Employer Approval Notification Email</label>
+              <p className="form-hint">When a new employer signs up, a notification will be sent to this email address. Leave blank to disable.</p>
+              <input
+                className="input"
+                type="email"
+                placeholder="admin@example.com"
+                value={notificationEmail}
+                onChange={(e) => setNotificationEmail(e.target.value)}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <button className="btn btn-primary" onClick={saveNotificationEmail}>
+                Save
+              </button>
+              {settingsSaved && <span style={{ color: '#2d9a46', fontWeight: 500 }}>Saved!</span>}
+            </div>
+          </div>
         </div>
       )}
     </div>

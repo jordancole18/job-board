@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "deploy": "npx supabase functions deploy notify-new-employer",
     "migrate": "npx supabase db push"
   },
   "dependencies": {
