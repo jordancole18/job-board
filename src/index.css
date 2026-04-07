@@ -1111,8 +1111,7 @@ select.input {
   box-shadow: var(--shadow-md);
   position: sticky;
   top: 88px;
-  display: flex;
-  flex-direction: column;
+  align-self: start;
 }
 
 .job-detail-sidebar .leaflet-container {
