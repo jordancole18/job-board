@@ -36,7 +36,7 @@ export default function AuthPage() {
 
     if (mode === 'signup') {
       if (!companyName.trim()) {
-        setError('Company name is required');
+        setError('Association name is required');
         setLoading(false);
         return;
       }
@@ -129,13 +129,13 @@ export default function AuthPage() {
         <form onSubmit={handleSubmit}>
           {mode === 'signup' && (
             <div className="form-group">
-              <label>Company Name</label>
+              <label>Association Name</label>
               <input
                 type="text"
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
                 className="input"
-                placeholder="Your company name"
+                placeholder="Your association name"
                 required
               />
             </div>
@@ -147,9 +147,14 @@ export default function AuthPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="input"
-              placeholder="you@company.com"
+              placeholder="you@association.org"
               required
             />
+            {mode === 'signup' && (
+              <p className="auth-email-disclaimer">
+                <strong>Important:</strong> This platform is exclusively for real estate association professionals. To be approved, you must register using your association-issued email address. Personal email accounts (Gmail, Yahoo, etc.) will not be approved.
+              </p>
+            )}
           </div>
           {mode !== 'forgot' && (
             <div className="form-group">

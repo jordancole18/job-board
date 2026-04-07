@@ -792,6 +792,21 @@ select.input {
   background: var(--border);
 }
 
+.auth-email-disclaimer {
+  margin-top: var(--space-xs);
+  padding: var(--space-sm);
+  background: rgba(249, 115, 22, 0.08);
+  border: 1px solid rgba(249, 115, 22, 0.2);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.auth-email-disclaimer strong {
+  color: #f97316;
+}
+
 .auth-toggle {
   text-align: center;
   font-size: 0.9rem;
@@ -3101,7 +3116,7 @@ select.input {
 .submit-resume-confidential {
   display: inline-block;
   margin-top: var(--space-sm);
-  font-size: 0.82rem !important;
+  font-size: 1rem !important;
   font-weight: 600;
   color: var(--primary) !important;
 }

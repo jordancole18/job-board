@@ -234,9 +234,6 @@ export default function DashboardPage() {
                 <strong>$0.00</strong>
               </div>
             </div>
-            <p className="billing-note">
-              Pricing details will be announced soon. You'll be notified before any charges apply.
-            </p>
           </div>
         </div>
       )}

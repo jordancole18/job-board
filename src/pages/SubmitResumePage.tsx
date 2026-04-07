@@ -117,7 +117,7 @@ export default function SubmitResumePage() {
           If a matching opportunity opens up, we'll reach out to you directly.
         </p>
         <p className="submit-resume-confidential">
-          Your information is kept confidential.
+          Rest assured, your information is always kept 100% Confidential.
         </p>
       </div>
 
