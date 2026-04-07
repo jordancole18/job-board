@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Briefcase, Users, Eye, ChevronRight, CreditCard, Clock } from 'lucide-react';
+import { Briefcase, Users, Eye, ChevronRight, CreditCard, Clock, Mail } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabase';
 
@@ -95,6 +95,9 @@ export default function DashboardPage() {
             {companyName && <p className="dashboard-company">{companyName}</p>}
           </div>
         </div>
+        <a href="mailto:support@associationcareers.realestate" className="dashboard-support-link">
+          <Mail size={14} /> Need help? Contact Support
+        </a>
         {isApproved ? (
           <Link to="/post-job" className="btn btn-primary">+ Post New Job</Link>
         ) : (
