@@ -107,7 +107,7 @@ export default function HomePage() {
       </Helmet>
       <section className="hero">
         <div className="hero-content">
-          <span className="hero-badge">Trusted by realtor associations nationwide</span>
+          <span className="hero-badge">The Only Job Board Built Exclusively for Real Estate Associations</span>
           <h1>Find Your Next <span className="hero-highlight">Career Move</span></h1>
           <p>Browse {jobs.length} open positions from associations across the United States</p>
         </div>
@@ -140,7 +140,7 @@ export default function HomePage() {
                 onChange={(e) => setArrangementFilter(e.target.value)}
                 className="hero-search-select"
               >
-                <option value="">All</option>
+                <option value="">Work Type</option>
                 {ARRANGEMENT_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}

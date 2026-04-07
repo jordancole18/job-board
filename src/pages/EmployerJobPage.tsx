@@ -72,6 +72,8 @@ export default function EmployerJobPage() {
     job_type: '', work_arrangement: '', address: '', city: '', state: '',
   });
   const [editLoading, setEditLoading] = useState(false);
+  const [allTags, setAllTags] = useState<{ id: string; name: string; color: string }[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -83,11 +85,14 @@ export default function EmployerJobPage() {
   }, [user, authLoading, id]);
 
   async function loadData() {
-    const [jobRes, appsRes, viewsRes] = await Promise.all([
+    const [jobRes, appsRes, viewsRes, tagsRes] = await Promise.all([
       supabase.from('jobs').select('*').eq('id', id).eq('employer_id', user!.id).single(),
       supabase.from('applications').select('*').eq('job_id', id).order('created_at', { ascending: false }),
       supabase.from('job_views').select('viewed_at').eq('job_id', id),
+      supabase.from('tags').select('id, name, color').order('name'),
     ]);
+
+    if (tagsRes.data) setAllTags(tagsRes.data);
 
     if (!jobRes.data) {
       navigate('/dashboard');
@@ -119,13 +124,19 @@ export default function EmployerJobPage() {
     setJob((prev) => prev ? { ...prev, status } : prev);
   }
 
-  function startEditing() {
+  async function startEditing() {
     if (!job) return;
     setEditForm({
       title: job.title, description: job.description, requirements: job.requirements,
       salary: job.salary, job_type: job.job_type, work_arrangement: job.work_arrangement,
       address: job.address || '', city: job.city, state: job.state,
     });
+    // Load current tags for this job
+    const { data: jobTags } = await supabase
+      .from('job_tags')
+      .select('tag_id')
+      .eq('job_id', id);
+    setSelectedTags(jobTags?.map((jt) => jt.tag_id) || []);
     setEditing(true);
   }
 
@@ -142,13 +153,45 @@ export default function EmployerJobPage() {
       city: editForm.city,
       state: editForm.state,
     }).eq('id', id);
-    setEditLoading(false);
     if (error) {
+      setEditLoading(false);
       alert('Failed to save: ' + error.message);
       return;
     }
+    // Update tags: delete all, re-insert selected
+    await supabase.from('job_tags').delete().eq('job_id', id);
+    if (selectedTags.length > 0) {
+      await supabase.from('job_tags').insert(
+        selectedTags.map((tagId) => ({ job_id: id, tag_id: tagId }))
+      );
+    }
+    setEditLoading(false);
     setJob((prev) => prev ? { ...prev, ...editForm } : prev);
     setEditing(false);
+  }
+
+  function toggleTag(tagId: string) {
+    setSelectedTags((prev) =>
+      prev.includes(tagId) ? prev.filter((t) => t !== tagId) : [...prev, tagId]
+    );
+  }
+
+  async function deleteApplication(app: Application) {
+    if (!confirm(`Delete application from ${app.first_name} ${app.last_name}? This cannot be undone.`)) return;
+    // Attempt storage cleanup first
+    const filesToRemove = [app.resume_url, app.cover_letter_url].filter(Boolean) as string[];
+    if (filesToRemove.length > 0) {
+      const { error: storageError } = await supabase.storage.from('applications').remove(filesToRemove);
+      if (storageError) console.warn('Storage cleanup failed:', storageError.message);
+    }
+    // Delete DB row
+    const { error } = await supabase.from('applications').delete().eq('id', app.id);
+    if (error) {
+      alert('Failed to delete: ' + error.message);
+      return;
+    }
+    setApplications((prev) => prev.filter((a) => a.id !== app.id));
+    if (activeAppIndex !== null) setActiveAppIndex(null);
   }
 
   async function updateAppStatus(appId: string, status: string) {
@@ -263,6 +306,24 @@ export default function EmployerJobPage() {
               </select>
             </div>
           </div>
+          {allTags.length > 0 && (
+            <div className="form-group">
+              <label>Categories</label>
+              <div className="tag-picker">
+                {allTags.map((tag) => (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    className={`tag-pill ${selectedTags.includes(tag.id) ? 'tag-pill-active' : ''}`}
+                    style={selectedTags.includes(tag.id) ? { backgroundColor: tag.color, borderColor: tag.color, color: 'white' } : { borderColor: tag.color, color: tag.color }}
+                    onClick={() => toggleTag(tag.id)}
+                  >
+                    {tag.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
             <button className="btn btn-primary" onClick={saveEdit} disabled={editLoading}>
               {editLoading ? 'Saving...' : 'Save Changes'}
@@ -414,6 +475,9 @@ export default function EmployerJobPage() {
                     )}
                     <button onClick={() => openAppDetail(index)} className="btn btn-outline btn-sm" type="button">
                       View Details
+                    </button>
+                    <button onClick={() => deleteApplication(app)} className="btn btn-danger btn-sm" type="button">
+                      <Trash2 size={14} /> Delete
                     </button>
                   </div>
                 </div>

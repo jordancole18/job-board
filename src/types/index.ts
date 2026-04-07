@@ -1,9 +1,19 @@
 export interface Employer {
   id: string;
-  email: string;
-  companyName: string;
-  isAdmin: boolean;
-  createdAt: string;
+  user_id: string;
+  company_name: string;
+  email: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  title: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  is_admin: boolean;
+  is_approved: boolean;
+  is_disabled: boolean;
+  created_at: string;
 }
 
 export interface JobPosting {

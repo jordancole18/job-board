@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Briefcase, Users, Eye, ChevronRight, CreditCard, Clock } from 'lucide-react';
+import { Briefcase, Users, Eye, ChevronRight, CreditCard, Clock, Mail } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabase';
 
@@ -103,6 +103,10 @@ export default function DashboardPage() {
           </span>
         )}
       </div>
+
+      <a href="mailto:support@associationcareers.realestate" className="dashboard-support-link">
+        <Mail size={14} /> Need help? Contact Support
+      </a>
 
       {!isApproved && (
         <div className="pending-approval-banner">
@@ -234,9 +238,6 @@ export default function DashboardPage() {
                 <strong>$0.00</strong>
               </div>
             </div>
-            <p className="billing-note">
-              Pricing details will be announced soon. You'll be notified before any charges apply.
-            </p>
           </div>
         </div>
       )}

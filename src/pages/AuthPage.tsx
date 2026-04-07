@@ -3,12 +3,20 @@ import { useNavigate } from 'react-router-dom';
 import { Briefcase, Mail, KeyRound } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabase';
+import { US_STATES } from '../constants/usStates';
 
 export default function AuthPage() {
   const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [companyName, setCompanyName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [title, setTitle] = useState('');
+  const [address, setAddress] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
+  const [zip, setZip] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [checkEmail, setCheckEmail] = useState(false);
@@ -36,11 +44,25 @@ export default function AuthPage() {
 
     if (mode === 'signup') {
       if (!companyName.trim()) {
-        setError('Company name is required');
+        setError('Association name is required');
         setLoading(false);
         return;
       }
-      const result = await signUp(email, password, companyName.trim());
+      if (!firstName.trim() || !lastName.trim()) {
+        setError('First and last name are required');
+        setLoading(false);
+        return;
+      }
+      const result = await signUp(email, password, {
+        companyName: companyName.trim(),
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        title: title.trim() || undefined,
+        address: address.trim() || undefined,
+        city: city.trim() || undefined,
+        state: state || undefined,
+        zip: zip.trim() || undefined,
+      });
       if (result === 'check_email') {
         setCheckEmail(true);
         setLoading(false);
@@ -128,17 +150,99 @@ export default function AuthPage() {
 
         <form onSubmit={handleSubmit}>
           {mode === 'signup' && (
-            <div className="form-group">
-              <label>Company Name</label>
-              <input
-                type="text"
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
-                className="input"
-                placeholder="Your company name"
-                required
-              />
-            </div>
+            <>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>First Name</label>
+                  <input
+                    type="text"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    className="input"
+                    placeholder="Jane"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Last Name</label>
+                  <input
+                    type="text"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    className="input"
+                    placeholder="Doe"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="form-group">
+                <label>Title (optional)</label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="input"
+                  placeholder="e.g. Executive Director"
+                />
+              </div>
+              <div className="form-group">
+                <label>Association Name</label>
+                <input
+                  type="text"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  className="input"
+                  placeholder="Your association name"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Address (optional)</label>
+                <input
+                  type="text"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  className="input"
+                  placeholder="Street address"
+                />
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>City (optional)</label>
+                  <input
+                    type="text"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    className="input"
+                    placeholder="City"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>State (optional)</label>
+                  <select
+                    value={state}
+                    onChange={(e) => setState(e.target.value)}
+                    className="input"
+                  >
+                    <option value="">Select state...</option>
+                    {US_STATES.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Zip (optional)</label>
+                  <input
+                    type="text"
+                    value={zip}
+                    onChange={(e) => setZip(e.target.value)}
+                    className="input"
+                    placeholder="Zip"
+                    maxLength={10}
+                  />
+                </div>
+              </div>
+            </>
           )}
           <div className="form-group">
             <label>Email</label>
@@ -147,9 +251,14 @@ export default function AuthPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="input"
-              placeholder="you@company.com"
+              placeholder="you@association.org"
               required
             />
+            {mode === 'signup' && (
+              <p className="auth-email-disclaimer">
+                <strong>Important:</strong> This platform is exclusively for real estate association professionals. To be approved, you must register using your association-issued email address. Personal email accounts (Gmail, Yahoo, etc.) will not be approved.
+              </p>
+            )}
           </div>
           {mode !== 'forgot' && (
             <div className="form-group">

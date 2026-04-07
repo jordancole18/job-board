@@ -2,6 +2,17 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../utils/supabase';
 
+interface SignUpFields {
+  companyName: string;
+  firstName: string;
+  lastName: string;
+  title?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+}
+
 interface AuthState {
   session: Session | null;
   user: User | null;
@@ -9,9 +20,10 @@ interface AuthState {
   isAdmin: boolean;
   isApproved: boolean;
   loading: boolean;
-  signUp: (email: string, password: string, companyName: string) => Promise<string | null>;
+  signUp: (email: string, password: string, fields: SignUpFields) => Promise<string | null>;
   signIn: (email: string, password: string) => Promise<string | null>;
   signOut: () => Promise<void>;
+  refreshEmployer: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
@@ -99,6 +111,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               user_id: user!.id,
               company_name: company,
               email: user!.email,
+              first_name: meta?.first_name || null,
+              last_name: meta?.last_name || null,
+              title: meta?.title || null,
+              address: meta?.address || null,
+              city: meta?.city || null,
+              state: meta?.state || null,
+              zip: meta?.zip || null,
             });
 
           if (error) {
@@ -118,12 +137,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ensureEmployerAndLoad();
   }, [user?.id, loading]);
 
-  async function signUp(email: string, password: string, company: string): Promise<string | null> {
-    // Store company_name in auth user metadata so it survives email confirmation
+  async function signUp(email: string, password: string, fields: SignUpFields): Promise<string | null> {
+    // Store all fields in auth user metadata so they survive email confirmation
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { company_name: company } },
+      options: {
+        data: {
+          company_name: fields.companyName,
+          first_name: fields.firstName,
+          last_name: fields.lastName,
+          title: fields.title || null,
+          address: fields.address || null,
+          city: fields.city || null,
+          state: fields.state || null,
+          zip: fields.zip || null,
+        },
+      },
     });
     if (error) return error.message;
 
@@ -131,9 +161,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Immediate session — create employer record now
       const { error: insertError } = await supabase
         .from('employers')
-        .insert({ user_id: data.user!.id, company_name: company, email });
+        .insert({
+          user_id: data.user!.id,
+          company_name: fields.companyName,
+          email,
+          first_name: fields.firstName,
+          last_name: fields.lastName,
+          title: fields.title || null,
+          address: fields.address || null,
+          city: fields.city || null,
+          state: fields.state || null,
+          zip: fields.zip || null,
+        });
       if (insertError) return insertError.message;
-      setCompanyName(company);
+      setCompanyName(fields.companyName);
     } else if (data.user) {
       // Email confirmation required — metadata is stored on the user,
       // employer record will be created when they confirm and the useEffect runs
@@ -148,6 +189,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return null;
   }
 
+  async function refreshEmployer() {
+    if (user) await fetchEmployerInfo(user.id);
+  }
+
   async function signOut() {
     await supabase.auth.signOut();
     setCompanyName(null);
@@ -156,7 +201,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ session, user, companyName, isAdmin, isApproved, loading, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ session, user, companyName, isAdmin, isApproved, loading, signUp, signIn, signOut, refreshEmployer }}>
       {children}
     </AuthContext.Provider>
   );
