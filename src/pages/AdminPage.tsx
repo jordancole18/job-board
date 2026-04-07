@@ -47,6 +47,13 @@ interface Employer {
   user_id: string;
   company_name: string;
   email: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  title: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
   is_admin: boolean;
   is_approved: boolean;
   is_disabled: boolean;
@@ -87,6 +94,14 @@ export default function AdminPage() {
   const [editJobForm, setEditJobForm] = useState({
     title: '', description: '', requirements: '', salary: '',
     job_type: '', work_arrangement: '', address: '', city: '', state: '',
+  });
+  const [editJobTags, setEditJobTags] = useState<string[]>([]);
+
+  // Employer editing state
+  const [editingEmployerId, setEditingEmployerId] = useState<string | null>(null);
+  const [editEmployerForm, setEditEmployerForm] = useState({
+    first_name: '', last_name: '', title: '', company_name: '',
+    email: '', address: '', city: '', state: '', zip: '',
   });
 
   // Settings state
@@ -226,12 +241,18 @@ export default function AdminPage() {
     setAllJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, status } : j));
   }
 
-  function startEditingJob(job: AdminJob) {
+  async function startEditingJob(job: AdminJob) {
     setEditJobForm({
       title: job.title, description: job.description, requirements: job.requirements,
       salary: job.salary, job_type: job.job_type, work_arrangement: job.work_arrangement,
       address: job.address || '', city: job.city, state: job.state,
     });
+    // Load current tags for this job
+    const { data: jobTags } = await supabase
+      .from('job_tags')
+      .select('tag_id')
+      .eq('job_id', job.id);
+    setEditJobTags(jobTags?.map((jt) => jt.tag_id) || []);
     setEditingJobId(job.id);
   }
 
@@ -251,8 +272,65 @@ export default function AdminPage() {
       alert('Failed to save: ' + error.message);
       return;
     }
+    // Update tags: delete all, re-insert selected
+    await supabase.from('job_tags').delete().eq('job_id', jobId);
+    if (editJobTags.length > 0) {
+      await supabase.from('job_tags').insert(
+        editJobTags.map((tagId) => ({ job_id: jobId, tag_id: tagId }))
+      );
+    }
     setAllJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, ...editJobForm } : j));
     setEditingJobId(null);
+  }
+
+  async function deleteSubmission(sub: Submission) {
+    if (!confirm(`Delete submission from ${sub.first_name} ${sub.last_name}? This cannot be undone.`)) return;
+    if (sub.resume_url) {
+      const { error: storageError } = await supabase.storage.from('applications').remove([sub.resume_url]);
+      if (storageError) console.warn('Storage cleanup failed:', storageError.message);
+    }
+    const { error } = await supabase.from('general_submissions').delete().eq('id', sub.id);
+    if (error) {
+      alert('Failed to delete: ' + error.message);
+      return;
+    }
+    setSubmissions((prev) => prev.filter((s) => s.id !== sub.id));
+    if (selectedSubmission?.id === sub.id) setSelectedSubmission(null);
+  }
+
+  function startEditingEmployer(emp: Employer) {
+    setEditEmployerForm({
+      first_name: emp.first_name || '',
+      last_name: emp.last_name || '',
+      title: emp.title || '',
+      company_name: emp.company_name,
+      email: emp.email || '',
+      address: emp.address || '',
+      city: emp.city || '',
+      state: emp.state || '',
+      zip: emp.zip || '',
+    });
+    setEditingEmployerId(emp.id);
+  }
+
+  async function saveEmployerEdit(employerId: string) {
+    const { error } = await supabase.from('employers').update({
+      first_name: editEmployerForm.first_name || null,
+      last_name: editEmployerForm.last_name || null,
+      title: editEmployerForm.title || null,
+      company_name: editEmployerForm.company_name,
+      email: editEmployerForm.email || null,
+      address: editEmployerForm.address || null,
+      city: editEmployerForm.city || null,
+      state: editEmployerForm.state || null,
+      zip: editEmployerForm.zip || null,
+    }).eq('id', employerId);
+    if (error) {
+      alert('Failed to save: ' + error.message);
+      return;
+    }
+    setEmployers((prev) => prev.map((e) => e.id === employerId ? { ...e, ...editEmployerForm } : e));
+    setEditingEmployerId(null);
   }
 
   async function downloadFile(storagePath: string) {
@@ -363,67 +441,140 @@ export default function AdminPage() {
                 const color = AVATAR_COLORS[emp.company_name.charCodeAt(0) % AVATAR_COLORS.length];
                 return (
                   <div key={emp.id} className={`admin-employer-item ${!emp.is_approved ? 'admin-employer-pending' : ''}`} style={emp.is_disabled ? { opacity: 0.5 } : {}}>
-                    <div className="admin-employer-info">
-                      <div className="ej-app-avatar" style={{ backgroundColor: emp.is_disabled ? '#6b7280' : color }}>
-                        {emp.company_name.charAt(0)}
-                      </div>
-                      <div>
-                        <strong>{emp.company_name}</strong>
-                        {emp.is_disabled && (
-                          <span className="status-badge" style={{ backgroundColor: 'rgba(239,68,68,0.1)', color: '#dc2626', marginLeft: '0.5rem', fontSize: '0.7rem' }}>
-                            <Ban size={10} /> Disabled
-                          </span>
-                        )}
-                        <span className="ej-app-email">
-                          {emp.email && <>{emp.email} · </>}
-                          Joined {new Date(emp.created_at).toLocaleDateString()}
-                          {emp.is_admin && ' · Admin'}
-                        </span>
-                      </div>
-                    </div>
-                    {emp.user_id === user!.id ? (
-                      <div className="admin-employer-actions">
-                        <span className="status-badge" style={{ backgroundColor: 'rgba(56,182,83,0.1)', color: '#2d9a46' }}>
-                          <Crown size={12} /> You
-                        </span>
+                    {editingEmployerId === emp.id ? (
+                      <div style={{ width: '100%' }}>
+                        <div className="form-row">
+                          <div className="form-group">
+                            <label>First Name</label>
+                            <input className="input" value={editEmployerForm.first_name} onChange={(e) => setEditEmployerForm((f) => ({ ...f, first_name: e.target.value }))} />
+                          </div>
+                          <div className="form-group">
+                            <label>Last Name</label>
+                            <input className="input" value={editEmployerForm.last_name} onChange={(e) => setEditEmployerForm((f) => ({ ...f, last_name: e.target.value }))} />
+                          </div>
+                        </div>
+                        <div className="form-row">
+                          <div className="form-group">
+                            <label>Title</label>
+                            <input className="input" value={editEmployerForm.title} onChange={(e) => setEditEmployerForm((f) => ({ ...f, title: e.target.value }))} />
+                          </div>
+                          <div className="form-group">
+                            <label>Association Name</label>
+                            <input className="input" value={editEmployerForm.company_name} onChange={(e) => setEditEmployerForm((f) => ({ ...f, company_name: e.target.value }))} />
+                          </div>
+                        </div>
+                        <div className="form-group">
+                          <label>Email</label>
+                          <input className="input" type="email" value={editEmployerForm.email} onChange={(e) => setEditEmployerForm((f) => ({ ...f, email: e.target.value }))} />
+                        </div>
+                        <div className="form-group">
+                          <label>Address</label>
+                          <input className="input" value={editEmployerForm.address} onChange={(e) => setEditEmployerForm((f) => ({ ...f, address: e.target.value }))} />
+                        </div>
+                        <div className="form-row">
+                          <div className="form-group">
+                            <label>City</label>
+                            <input className="input" value={editEmployerForm.city} onChange={(e) => setEditEmployerForm((f) => ({ ...f, city: e.target.value }))} />
+                          </div>
+                          <div className="form-group">
+                            <label>State</label>
+                            <select className="input" value={editEmployerForm.state} onChange={(e) => setEditEmployerForm((f) => ({ ...f, state: e.target.value }))}>
+                              <option value="">Select state...</option>
+                              {US_STATES.map((s) => (
+                                <option key={s.value} value={s.value}>{s.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="form-group">
+                            <label>Zip</label>
+                            <input className="input" value={editEmployerForm.zip} onChange={(e) => setEditEmployerForm((f) => ({ ...f, zip: e.target.value }))} maxLength={10} />
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                          <button className="btn btn-sm btn-primary" onClick={() => saveEmployerEdit(emp.id)}>
+                            <Check size={14} /> Save
+                          </button>
+                          <button className="btn btn-sm btn-outline" onClick={() => setEditingEmployerId(null)}>
+                            <X size={14} /> Cancel
+                          </button>
+                        </div>
                       </div>
                     ) : (
-                      <div className="admin-employer-actions">
-                        {!emp.is_admin && (
-                          <button
-                            className={`btn btn-sm ${emp.is_approved ? 'btn-outline' : 'btn-primary'}`}
-                            onClick={() => toggleApproval(emp.id, emp.is_approved)}
-                          >
-                            {emp.is_approved ? (
-                              <><ShieldX size={14} /> Revoke</>
-                            ) : (
-                              <><ShieldCheck size={14} /> Approve</>
+                      <>
+                        <div className="admin-employer-info">
+                          <div className="ej-app-avatar" style={{ backgroundColor: emp.is_disabled ? '#6b7280' : color }}>
+                            {emp.company_name.charAt(0)}
+                          </div>
+                          <div>
+                            <strong>{emp.company_name}</strong>
+                            {emp.first_name && emp.last_name && (
+                              <span style={{ marginLeft: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                                ({emp.first_name} {emp.last_name}{emp.title ? `, ${emp.title}` : ''})
+                              </span>
                             )}
-                          </button>
+                            {emp.is_disabled && (
+                              <span className="status-badge" style={{ backgroundColor: 'rgba(239,68,68,0.1)', color: '#dc2626', marginLeft: '0.5rem', fontSize: '0.7rem' }}>
+                                <Ban size={10} /> Disabled
+                              </span>
+                            )}
+                            <span className="ej-app-email">
+                              {emp.email && <>{emp.email} · </>}
+                              Joined {new Date(emp.created_at).toLocaleDateString()}
+                              {emp.is_admin && ' · Admin'}
+                            </span>
+                          </div>
+                        </div>
+                        {emp.user_id === user!.id ? (
+                          <div className="admin-employer-actions">
+                            <span className="status-badge" style={{ backgroundColor: 'rgba(56,182,83,0.1)', color: '#2d9a46' }}>
+                              <Crown size={12} /> You
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="admin-employer-actions">
+                            <button
+                              className="btn btn-sm btn-outline"
+                              onClick={() => startEditingEmployer(emp)}
+                            >
+                              <Pencil size={14} /> Edit
+                            </button>
+                            {!emp.is_admin && (
+                              <button
+                                className={`btn btn-sm ${emp.is_approved ? 'btn-outline' : 'btn-primary'}`}
+                                onClick={() => toggleApproval(emp.id, emp.is_approved)}
+                              >
+                                {emp.is_approved ? (
+                                  <><ShieldX size={14} /> Revoke</>
+                                ) : (
+                                  <><ShieldCheck size={14} /> Approve</>
+                                )}
+                              </button>
+                            )}
+                            <button
+                              className={`btn btn-sm ${emp.is_disabled ? 'btn-primary' : 'btn-outline'}`}
+                              onClick={() => toggleDisabled(emp.id, emp.is_disabled)}
+                            >
+                              {emp.is_disabled ? (
+                                <><ShieldCheck size={14} /> Enable</>
+                              ) : (
+                                <><Ban size={14} /> Disable</>
+                              )}
+                            </button>
+                            <button
+                              className={`btn btn-sm ${emp.is_admin ? 'btn-danger' : 'btn-outline'}`}
+                              onClick={() => toggleAdmin(emp.id, emp.is_admin)}
+                            >
+                              <Crown size={14} /> {emp.is_admin ? 'Remove Admin' : 'Make Admin'}
+                            </button>
+                            <button
+                              className="btn btn-sm btn-danger"
+                              onClick={() => deleteEmployer(emp.id)}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
                         )}
-                        <button
-                          className={`btn btn-sm ${emp.is_disabled ? 'btn-primary' : 'btn-outline'}`}
-                          onClick={() => toggleDisabled(emp.id, emp.is_disabled)}
-                        >
-                          {emp.is_disabled ? (
-                            <><ShieldCheck size={14} /> Enable</>
-                          ) : (
-                            <><Ban size={14} /> Disable</>
-                          )}
-                        </button>
-                        <button
-                          className={`btn btn-sm ${emp.is_admin ? 'btn-danger' : 'btn-outline'}`}
-                          onClick={() => toggleAdmin(emp.id, emp.is_admin)}
-                        >
-                          <Crown size={14} /> {emp.is_admin ? 'Remove Admin' : 'Make Admin'}
-                        </button>
-                        <button
-                          className="btn btn-sm btn-danger"
-                          onClick={() => deleteEmployer(emp.id)}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
+                      </>
                     )}
                   </div>
                 );
@@ -551,6 +702,9 @@ export default function AdminPage() {
                       >
                         <Eye size={14} /> {selectedSubmission?.id === sub.id ? 'Hide' : 'Details'}
                       </button>
+                      <button onClick={() => deleteSubmission(sub)} className="btn btn-danger btn-sm" type="button">
+                        <Trash2 size={14} /> Delete
+                      </button>
                     </div>
 
                     {selectedSubmission?.id === sub.id && (
@@ -637,6 +791,24 @@ export default function AdminPage() {
                           </select>
                         </div>
                       </div>
+                      {tags.length > 0 && (
+                        <div className="form-group">
+                          <label>Categories</label>
+                          <div className="tag-picker">
+                            {tags.map((tag) => (
+                              <button
+                                key={tag.id}
+                                type="button"
+                                className={`tag-pill ${editJobTags.includes(tag.id) ? 'tag-pill-active' : ''}`}
+                                style={editJobTags.includes(tag.id) ? { backgroundColor: tag.color, borderColor: tag.color, color: 'white' } : { borderColor: tag.color, color: tag.color }}
+                                onClick={() => setEditJobTags((prev) => prev.includes(tag.id) ? prev.filter((t) => t !== tag.id) : [...prev, tag.id])}
+                              >
+                                {tag.name}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
                         <button className="btn btn-sm btn-primary" onClick={() => saveJobEdit(job.id)}>
                           <Check size={14} /> Save
