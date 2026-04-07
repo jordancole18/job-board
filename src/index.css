@@ -77,6 +77,7 @@ body,
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  width: 100%;
 }
 
 body {
@@ -408,8 +409,10 @@ select.input {
    ================================================ */
 .page {
   max-width: 1200px;
+  width: 100%;
   margin: 0 auto;
   padding: var(--space-xl) var(--space-lg);
+  flex: 1;
 }
 
 .page-header {
@@ -1257,6 +1260,7 @@ select.input {
   font-size: 0.82rem;
   color: var(--text-muted);
   text-decoration: none;
+  margin-bottom: var(--space-md);
 }
 
 .dashboard-support-link:hover {

@@ -95,9 +95,6 @@ export default function DashboardPage() {
             {companyName && <p className="dashboard-company">{companyName}</p>}
           </div>
         </div>
-        <a href="mailto:support@associationcareers.realestate" className="dashboard-support-link">
-          <Mail size={14} /> Need help? Contact Support
-        </a>
         {isApproved ? (
           <Link to="/post-job" className="btn btn-primary">+ Post New Job</Link>
         ) : (
@@ -106,6 +103,10 @@ export default function DashboardPage() {
           </span>
         )}
       </div>
+
+      <a href="mailto:support@associationcareers.realestate" className="dashboard-support-link">
+        <Mail size={14} /> Need help? Contact Support
+      </a>
 
       {!isApproved && (
         <div className="pending-approval-banner">
