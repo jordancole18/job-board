@@ -66,6 +66,20 @@ function FlyToHandler({ center, zoom }: { center: [number, number]; zoom: number
 }
 
 export default function MapView({ jobs, center = [39.8283, -98.5795], zoom = 4 }: Props) {
+  const markers = jobs.map((job) => (
+    <Marker key={job.id} position={[job.lat, job.lng]} icon={jobIcon}>
+      <Popup>
+        <div className="map-popup">
+          <strong>{job.title}</strong>
+          <p>{job.company_name}</p>
+          <p>{job.city}, {job.state}</p>
+          <p>{job.salary}</p>
+          <Link to={`/jobs/${job.id}`}>View Details &rarr;</Link>
+        </div>
+      </Popup>
+    </Marker>
+  ));
+
   return (
     <MapContainer center={center} zoom={zoom} className="map-container">
       <FlyToHandler center={center} zoom={zoom} />
@@ -73,27 +87,19 @@ export default function MapView({ jobs, center = [39.8283, -98.5795], zoom = 4 }
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
         url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
       />
-      <MarkerClusterGroup
-        chunkedLoading
-        iconCreateFunction={createClusterIcon}
-        maxClusterRadius={50}
-        spiderfyOnMaxZoom
-        showCoverageOnHover={false}
-      >
-        {jobs.map((job) => (
-          <Marker key={job.id} position={[job.lat, job.lng]} icon={jobIcon}>
-            <Popup>
-              <div className="map-popup">
-                <strong>{job.title}</strong>
-                <p>{job.company_name}</p>
-                <p>{job.city}, {job.state}</p>
-                <p>{job.salary}</p>
-                <Link to={`/jobs/${job.id}`}>View Details &rarr;</Link>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
-      </MarkerClusterGroup>
+      {jobs.length > 1 ? (
+        <MarkerClusterGroup
+          chunkedLoading
+          iconCreateFunction={createClusterIcon}
+          maxClusterRadius={50}
+          spiderfyOnMaxZoom
+          showCoverageOnHover={false}
+        >
+          {markers}
+        </MarkerClusterGroup>
+      ) : (
+        markers
+      )}
     </MapContainer>
   );
 }

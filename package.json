@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "deploy": "npx supabase functions deploy notify-new-employer --no-verify-jwt",
+    "deploy": "npx supabase functions deploy notify-new-employer --no-verify-jwt && npx supabase functions deploy notify-employer-application --no-verify-jwt && npx supabase functions deploy notify-admin-resume --no-verify-jwt",
     "migrate": "npx supabase db push"
   },
   "dependencies": {

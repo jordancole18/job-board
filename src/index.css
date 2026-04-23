@@ -283,6 +283,10 @@ a:hover {
     display: none;
   }
 
+  .navbar-powered-by {
+    display: none;
+  }
+
   .navbar-mobile-profile-btn {
     display: flex;
     align-items: center;
@@ -2706,6 +2710,20 @@ select.input {
   display: flex;
   flex-direction: column;
   gap: 0;
+}
+
+.navbar-powered-by {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-weight: 400;
+  white-space: nowrap;
+  margin-top: -2px;
+  padding-left: 38px;
+}
+
+.navbar-powered-by strong {
+  color: var(--text-secondary);
+  font-weight: 600;
 }
 
 /* ===== Tag Picker ===== */

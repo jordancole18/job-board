@@ -50,6 +50,9 @@ export default function Navbar({ onEditProfile }: NavbarProps) {
             </svg>
             Association Careers
           </Link>
+          <span className="navbar-powered-by">
+            powered by <strong>Paramount Consulting Group</strong>
+          </span>
         </div>
         <button className="navbar-toggle" onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle menu">
           {menuOpen ? <X size={22} /> : <Menu size={22} />}

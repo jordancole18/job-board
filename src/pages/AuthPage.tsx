@@ -53,15 +53,25 @@ export default function AuthPage() {
         setLoading(false);
         return;
       }
+      if (!title.trim()) {
+        setError('Title is required');
+        setLoading(false);
+        return;
+      }
+      if (!address.trim() || !city.trim() || !state || !zip.trim()) {
+        setError('Address, city, state, and zip are required');
+        setLoading(false);
+        return;
+      }
       const result = await signUp(email, password, {
         companyName: companyName.trim(),
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        title: title.trim() || undefined,
-        address: address.trim() || undefined,
-        city: city.trim() || undefined,
-        state: state || undefined,
-        zip: zip.trim() || undefined,
+        title: title.trim(),
+        address: address.trim(),
+        city: city.trim(),
+        state: state,
+        zip: zip.trim(),
       });
       if (result === 'check_email') {
         setCheckEmail(true);
@@ -176,13 +186,14 @@ export default function AuthPage() {
                 </div>
               </div>
               <div className="form-group">
-                <label>Title (optional)</label>
+                <label>Title</label>
                 <input
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   className="input"
                   placeholder="e.g. Executive Director"
+                  required
                 />
               </div>
               <div className="form-group">
@@ -197,32 +208,35 @@ export default function AuthPage() {
                 />
               </div>
               <div className="form-group">
-                <label>Address (optional)</label>
+                <label>Address</label>
                 <input
                   type="text"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   className="input"
                   placeholder="Street address"
+                  required
                 />
               </div>
               <div className="form-row">
                 <div className="form-group">
-                  <label>City (optional)</label>
+                  <label>City</label>
                   <input
                     type="text"
                     value={city}
                     onChange={(e) => setCity(e.target.value)}
                     className="input"
                     placeholder="City"
+                    required
                   />
                 </div>
                 <div className="form-group">
-                  <label>State (optional)</label>
+                  <label>State</label>
                   <select
                     value={state}
                     onChange={(e) => setState(e.target.value)}
                     className="input"
+                    required
                   >
                     <option value="">Select state...</option>
                     {US_STATES.map((s) => (
@@ -231,7 +245,7 @@ export default function AuthPage() {
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>Zip (optional)</label>
+                  <label>Zip</label>
                   <input
                     type="text"
                     value={zip}
@@ -239,6 +253,7 @@ export default function AuthPage() {
                     className="input"
                     placeholder="Zip"
                     maxLength={10}
+                    required
                   />
                 </div>
               </div>
