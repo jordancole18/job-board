@@ -4,7 +4,7 @@ import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, MapPin, DollarSign, Calendar, MapPinned } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import { getArrangementStyle, getJobTypeStyle } from '../constants/jobStyles';
-import MapView from '../components/MapView';
+import SafeMapView from '../components/SafeMapView';
 
 interface JobTag {
   tags: { name: string; color: string };
@@ -183,7 +183,7 @@ export default function JobDetailPage() {
             if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
               return <p className="job-detail-no-map">Map unavailable for this location.</p>;
             }
-            return <MapView jobs={[{ ...job, lat, lng }]} center={[lat, lng]} zoom={12} />;
+            return <SafeMapView jobs={[{ ...job, lat, lng }]} center={[lat, lng]} zoom={12} />;
           })()}
         </div>
       </div>

@@ -1143,6 +1143,28 @@ select.input {
   border-radius: var(--radius-md);
 }
 
+.map-fallback {
+  height: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  background: var(--surface-alt, #f8fafc);
+  border: 1px solid var(--border-light, #e5e7eb);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  text-align: center;
+}
+
+.map-fallback small {
+  color: #94a3b8;
+  font-size: 0.7rem;
+  word-break: break-word;
+}
+
 /* ===== Apply Form ===== */
 .apply-form {
   margin-top: 32px;

@@ -5,7 +5,7 @@ import { Search, MapPin, DollarSign, List, Map } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import { haversineDistance, radiusToZoom } from '../utils/distance';
 import { getArrangementStyle, getJobTypeStyle, JOB_TYPE_OPTIONS, ARRANGEMENT_OPTIONS } from '../constants/jobStyles';
-import MapView from '../components/MapView';
+import SafeMapView from '../components/SafeMapView';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 
 interface JobTag {
@@ -304,7 +304,7 @@ export default function MapPage() {
         {loading ? (
           <div className="loading">Loading map...</div>
         ) : (
-          <MapView jobs={filtered} center={mapCenter} zoom={mapZoom} />
+          <SafeMapView jobs={filtered} center={mapCenter} zoom={mapZoom} />
         )}
       </div>
     </div>
