@@ -12,8 +12,8 @@ interface Job {
   city: string;
   state: string;
   salary: string;
-  lat: number;
-  lng: number;
+  lat: number | string | null;
+  lng: number | string | null;
 }
 
 const greenMarkerSvg = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 25 41"><path d="M12.5 0C5.6 0 0 5.6 0 12.5 0 22.2 12.5 41 12.5 41S25 22.2 25 12.5C25 5.6 19.4 0 12.5 0z" fill="#38b653"/><circle cx="12.5" cy="12.5" r="5.5" fill="white"/></svg>`);
@@ -67,21 +67,31 @@ function FlyToHandler({ center, zoom }: { center: [number, number]; zoom: number
 
 const US_CENTER: [number, number] = [39.8283, -98.5795];
 
-function isValidCoord(n: unknown): n is number {
-  return typeof n === 'number' && Number.isFinite(n);
+function toCoord(v: unknown): number | null {
+  if (v === null || v === undefined || v === '') return null;
+  const n = typeof v === 'number' ? v : parseFloat(String(v));
+  return Number.isFinite(n) ? n : null;
 }
 
-function isValidCenter(c: [number, number]): boolean {
-  return isValidCoord(c[0]) && isValidCoord(c[1]);
+function toLatLng(lat: unknown, lng: unknown): [number, number] | null {
+  const a = toCoord(lat);
+  const b = toCoord(lng);
+  return a !== null && b !== null ? [a, b] : null;
 }
 
 export default function MapView({ jobs, center = US_CENTER, zoom = 4 }: Props) {
-  const validJobs = jobs.filter((j) => isValidCoord(j.lat) && isValidCoord(j.lng));
-  const safeCenter = isValidCenter(center) ? center : US_CENTER;
-  const safeZoom = isValidCoord(zoom) ? zoom : 4;
+  const validMarkers = jobs
+    .map((job) => {
+      const pos = toLatLng(job.lat, job.lng);
+      return pos ? { job, pos } : null;
+    })
+    .filter((m): m is { job: Job; pos: [number, number] } => m !== null);
 
-  const markers = validJobs.map((job) => (
-    <Marker key={job.id} position={[job.lat, job.lng]} icon={jobIcon}>
+  const safeCenter = toLatLng(center[0], center[1]) ?? US_CENTER;
+  const safeZoom = Number.isFinite(zoom) ? zoom : 4;
+
+  const markers = validMarkers.map(({ job, pos }) => (
+    <Marker key={job.id} position={pos} icon={jobIcon}>
       <Popup>
         <div className="map-popup">
           <strong>{job.title}</strong>
@@ -101,7 +111,7 @@ export default function MapView({ jobs, center = US_CENTER, zoom = 4 }: Props) {
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
         url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
       />
-      {validJobs.length > 1 ? (
+      {validMarkers.length > 1 ? (
         <MarkerClusterGroup
           chunkedLoading
           iconCreateFunction={createClusterIcon}

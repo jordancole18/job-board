@@ -177,11 +177,14 @@ export default function JobDetailPage() {
 
         <div className="job-detail-sidebar">
           <h3><MapPinned size={16} /> Location</h3>
-          {Number.isFinite(job.lat) && Number.isFinite(job.lng) ? (
-            <MapView jobs={[job]} center={[job.lat, job.lng]} zoom={12} />
-          ) : (
-            <p className="job-detail-no-map">Map unavailable for this location.</p>
-          )}
+          {(() => {
+            const lat = parseFloat(String(job.lat));
+            const lng = parseFloat(String(job.lng));
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+              return <p className="job-detail-no-map">Map unavailable for this location.</p>;
+            }
+            return <MapView jobs={[{ ...job, lat, lng }]} center={[lat, lng]} zoom={12} />;
+          })()}
         </div>
       </div>
     </div>
