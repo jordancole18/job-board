@@ -7,13 +7,18 @@ import L from 'leaflet';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const OriginalLatLng: any = L.LatLng;
 
+// Match Leaflet's own check (isNaN). We must allow ±Infinity through because
+// leaflet.markercluster initializes a static `_mapBoundsInfinite` with
+// `new L.LatLng(±Infinity, ±Infinity)` at module load — substituting those
+// would silently break all marker visibility math.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function SafeLatLng(this: any, lat: number, lng: number, alt?: number) {
   let safeLat = lat;
   let safeLng = lng;
-  if (!Number.isFinite(safeLat) || !Number.isFinite(safeLng)) {
+  // eslint-disable-next-line no-restricted-globals
+  if (isNaN(safeLat as number) || isNaN(safeLng as number)) {
     if (typeof console !== 'undefined') {
-      console.warn('[leafletPatch] Substituting (0,0) for invalid LatLng', { lat, lng });
+      console.warn('[leafletPatch] Substituting (0,0) for NaN LatLng', { lat, lng });
     }
     safeLat = 0;
     safeLng = 0;
@@ -38,4 +43,4 @@ const originalLatLngFactory = L.latLng;
   }
 } as typeof originalLatLngFactory;
 
-export const LEAFLET_PATCH_VERSION = '2026-04-26-1';
+export const LEAFLET_PATCH_VERSION = '2026-04-26-2';
