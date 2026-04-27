@@ -43,4 +43,4 @@ const originalLatLngFactory = L.latLng;
   }
 } as typeof originalLatLngFactory;
 
-export const LEAFLET_PATCH_VERSION = '2026-04-26-2';
+export const LEAFLET_PATCH_VERSION = '2026-04-26-3-no-cluster';

@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import MarkerClusterGroup from 'react-leaflet-cluster';
-import { Icon, DivIcon, point } from 'leaflet';
+import { Icon } from 'leaflet';
 import { Link } from 'react-router-dom';
 import 'leaflet/dist/leaflet.css';
 
@@ -26,30 +25,6 @@ const jobIcon = new Icon({
   popupAnchor: [1, -34],
   shadowSize: [41, 41],
 });
-
-function createClusterIcon(cluster: { getChildCount: () => number }) {
-  const count = cluster.getChildCount();
-  const size = count < 10 ? 36 : count < 50 ? 44 : 52;
-  return new DivIcon({
-    html: `<div style="
-      background: #38b653;
-      color: white;
-      width: ${size}px;
-      height: ${size}px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 700;
-      font-size: ${count < 10 ? '14px' : '13px'};
-      font-family: Inter, sans-serif;
-      box-shadow: 0 2px 8px rgba(56, 182, 83, 0.4);
-      border: 3px solid white;
-    ">${count}</div>`,
-    className: 'custom-cluster-icon',
-    iconSize: point(size, size, true),
-  });
-}
 
 interface Props {
   jobs: Job[];
@@ -111,19 +86,7 @@ export default function MapView({ jobs, center = US_CENTER, zoom = 4 }: Props) {
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
         url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
       />
-      {validMarkers.length > 1 ? (
-        <MarkerClusterGroup
-          chunkedLoading
-          iconCreateFunction={createClusterIcon}
-          maxClusterRadius={50}
-          spiderfyOnMaxZoom
-          showCoverageOnHover={false}
-        >
-          {markers}
-        </MarkerClusterGroup>
-      ) : (
-        markers
-      )}
+      {markers}
     </MapContainer>
   );
 }

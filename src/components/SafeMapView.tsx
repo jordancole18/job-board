@@ -24,6 +24,7 @@ class MapErrorBoundary extends Component<{ children: ReactNode }, State> {
         <div className="map-fallback">
           <p>Map unavailable.</p>
           <small>{this.state.error.message}</small>
+          <pre className="map-fallback-stack">{this.state.error.stack}</pre>
         </div>
       );
     }

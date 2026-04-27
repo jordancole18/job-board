@@ -1165,6 +1165,21 @@ select.input {
   word-break: break-word;
 }
 
+.map-fallback-stack {
+  max-width: 100%;
+  max-height: 160px;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 0.65rem;
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #475569;
+}
+
 /* ===== Apply Form ===== */
 .apply-form {
   margin-top: 32px;
