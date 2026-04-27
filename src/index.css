@@ -1134,6 +1134,15 @@ select.input {
   gap: 8px;
 }
 
+.job-detail-no-map {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  padding: 24px 12px;
+  text-align: center;
+  background: var(--surface-alt, #f8fafc);
+  border-radius: var(--radius-md);
+}
+
 /* ===== Apply Form ===== */
 .apply-form {
   margin-top: 32px;

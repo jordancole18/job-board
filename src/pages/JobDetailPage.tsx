@@ -177,7 +177,11 @@ export default function JobDetailPage() {
 
         <div className="job-detail-sidebar">
           <h3><MapPinned size={16} /> Location</h3>
-          <MapView jobs={[job]} center={[job.lat, job.lng]} zoom={12} />
+          {Number.isFinite(job.lat) && Number.isFinite(job.lng) ? (
+            <MapView jobs={[job]} center={[job.lat, job.lng]} zoom={12} />
+          ) : (
+            <p className="job-detail-no-map">Map unavailable for this location.</p>
+          )}
         </div>
       </div>
     </div>

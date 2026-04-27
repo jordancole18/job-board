@@ -65,8 +65,22 @@ function FlyToHandler({ center, zoom }: { center: [number, number]; zoom: number
   return null;
 }
 
-export default function MapView({ jobs, center = [39.8283, -98.5795], zoom = 4 }: Props) {
-  const markers = jobs.map((job) => (
+const US_CENTER: [number, number] = [39.8283, -98.5795];
+
+function isValidCoord(n: unknown): n is number {
+  return typeof n === 'number' && Number.isFinite(n);
+}
+
+function isValidCenter(c: [number, number]): boolean {
+  return isValidCoord(c[0]) && isValidCoord(c[1]);
+}
+
+export default function MapView({ jobs, center = US_CENTER, zoom = 4 }: Props) {
+  const validJobs = jobs.filter((j) => isValidCoord(j.lat) && isValidCoord(j.lng));
+  const safeCenter = isValidCenter(center) ? center : US_CENTER;
+  const safeZoom = isValidCoord(zoom) ? zoom : 4;
+
+  const markers = validJobs.map((job) => (
     <Marker key={job.id} position={[job.lat, job.lng]} icon={jobIcon}>
       <Popup>
         <div className="map-popup">
@@ -81,13 +95,13 @@ export default function MapView({ jobs, center = [39.8283, -98.5795], zoom = 4 }
   ));
 
   return (
-    <MapContainer center={center} zoom={zoom} className="map-container">
-      <FlyToHandler center={center} zoom={zoom} />
+    <MapContainer center={safeCenter} zoom={safeZoom} className="map-container">
+      <FlyToHandler center={safeCenter} zoom={safeZoom} />
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
         url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
       />
-      {jobs.length > 1 ? (
+      {validJobs.length > 1 ? (
         <MarkerClusterGroup
           chunkedLoading
           iconCreateFunction={createClusterIcon}
