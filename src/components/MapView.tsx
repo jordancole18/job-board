@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { Icon } from 'leaflet';
 import { Link } from 'react-router-dom';
@@ -34,7 +34,21 @@ interface Props {
 
 function FlyToHandler({ center, zoom }: { center: [number, number]; zoom: number }) {
   const map = useMap();
+  const isFirstRun = useRef(true);
   useEffect(() => {
+    // MapContainer's center/zoom props already position the map on mount.
+    // Skipping the initial flyTo avoids a Leaflet internal projection bug
+    // where the map's just-mounted state can produce NaN coordinates,
+    // especially on mobile when the container has just become visible.
+    if (isFirstRun.current) {
+      isFirstRun.current = false;
+      map.invalidateSize();
+      return;
+    }
+    if (!Number.isFinite(center[0]) || !Number.isFinite(center[1]) || !Number.isFinite(zoom)) {
+      return;
+    }
+    map.invalidateSize();
     map.flyTo(center, zoom, { duration: 1.2 });
   }, [center[0], center[1], zoom]);
   return null;
