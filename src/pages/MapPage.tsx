@@ -63,6 +63,20 @@ export default function MapPage() {
   const [mapZoom, setMapZoom] = useState(4);
   const [hoveredJob, setHoveredJob] = useState<string | null>(null);
   const [mobileView, setMobileView] = useState<'list' | 'map'>('list');
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)');
+    const onChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  // Only mount the map when its container is actually visible. Leaflet crashes
+  // when initialized inside a display:none element (0x0 dimensions).
+  const mapVisible = !isMobile || mobileView === 'map';
 
   useEffect(() => {
     async function load() {
@@ -303,9 +317,9 @@ export default function MapPage() {
       <div className={`explore-map explore-mobile-${mobileView === 'map' ? 'show' : 'hide'}`}>
         {loading ? (
           <div className="loading">Loading map...</div>
-        ) : (
+        ) : mapVisible ? (
           <SafeMapView jobs={filtered} center={mapCenter} zoom={mapZoom} />
-        )}
+        ) : null}
       </div>
     </div>
   );
