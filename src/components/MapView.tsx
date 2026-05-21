@@ -79,16 +79,42 @@ export default function MapView({ jobs, center = US_CENTER, zoom = 4 }: Props) {
   const safeCenter = toLatLng(center[0], center[1]) ?? US_CENTER;
   const safeZoom = Number.isFinite(zoom) ? zoom : 4;
 
-  const markers = validMarkers.map(({ job, pos }) => (
-    <Marker key={job.id} position={pos} icon={jobIcon}>
+  // Group jobs that share a location so overlapping markers don't hide each other.
+  // Rounding to 5 decimals (~1m) treats geocoded duplicates of the same address as one point.
+  const groups = new Map<string, { pos: [number, number]; jobs: Job[] }>();
+  for (const { job, pos } of validMarkers) {
+    const key = `${pos[0].toFixed(5)},${pos[1].toFixed(5)}`;
+    const existing = groups.get(key);
+    if (existing) existing.jobs.push(job);
+    else groups.set(key, { pos, jobs: [job] });
+  }
+
+  const markers = Array.from(groups.values()).map(({ pos, jobs: jobsHere }) => (
+    <Marker key={jobsHere.map((j) => j.id).join('|')} position={pos} icon={jobIcon}>
       <Popup>
-        <div className="map-popup">
-          <strong>{job.title}</strong>
-          <p>{job.company_name}</p>
-          <p>{job.city}, {job.state}</p>
-          <p>{job.salary}</p>
-          <Link to={`/jobs/${job.id}`}>View Details &rarr;</Link>
-        </div>
+        {jobsHere.length === 1 ? (
+          <div className="map-popup">
+            <strong>{jobsHere[0].title}</strong>
+            <p>{jobsHere[0].company_name}</p>
+            <p>{jobsHere[0].city}, {jobsHere[0].state}</p>
+            <p>{jobsHere[0].salary}</p>
+            <Link to={`/jobs/${jobsHere[0].id}`}>View Details &rarr;</Link>
+          </div>
+        ) : (
+          <div className="map-popup map-popup-multi">
+            <strong>{jobsHere.length} jobs at this location</strong>
+            <ul className="map-popup-list">
+              {jobsHere.map((job) => (
+                <li key={job.id}>
+                  <Link to={`/jobs/${job.id}`}>
+                    <span className="map-popup-list-title">{job.title}</span>
+                    <span className="map-popup-list-meta">{job.company_name} &middot; {job.salary}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </Popup>
     </Marker>
   ));

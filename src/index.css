@@ -1286,6 +1286,44 @@ select.input {
   margin-top: 8px;
   font-weight: 600;
 }
+.map-popup-multi {
+  min-width: 200px;
+}
+.map-popup-multi strong {
+  margin-bottom: 6px;
+}
+.map-popup-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.map-popup-list li + li {
+  border-top: 1px solid var(--border);
+}
+.map-popup-list a {
+  display: block;
+  margin: 0;
+  padding: 8px 0;
+  font-weight: 500;
+  text-decoration: none;
+}
+.map-popup-list a:hover {
+  background: var(--bg-subtle, #f6f7f9);
+}
+.map-popup-list-title {
+  display: block;
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.map-popup-list-meta {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  margin-top: 2px;
+}
 
 /* ================================================
    DASHBOARD
