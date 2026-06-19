@@ -308,7 +308,7 @@ SELECT cron.schedule('daily-job-maintenance', '0 13 * * *',
 
 ## Acceptance Criteria
 
-**Search/Map (Phase 1)** — ✅ implemented (manual verification pending)
+**Search/Map (Phase 1)** — ✅ implemented & verified in-app (agent-browser, Jun 18: "Finance"→1 tagged hit, "CEO"→2 on both pages, California z6 / Columbus z11, hover popups + grouped list confirmed, 0 JS errors)
 - [x] Keyword matches title + company + description + tag names on **both** HomePage and MapPage; MapPage query fetches `tags(name)` + `description`; tagless jobs still match other fields.
 - [x] State search frames the whole state via boundingbox; city stays city-level; radius overrides; bbox clamped to `maxZoom 13`.
 - [x] Markers open popups on hover (desktop) / tap (mobile); co-located jobs show one capped, scrollable, link-clickable popup with no flicker; click fallback retained.
