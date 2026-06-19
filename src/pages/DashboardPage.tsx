@@ -12,6 +12,7 @@ interface Job {
   job_type: string;
   work_arrangement: string;
   status: string;
+  expires_at: string;
   created_at: string;
 }
 
@@ -19,7 +20,15 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }>
   active: { bg: 'rgba(56,182,83,0.1)', text: '#2d9a46', label: 'Active' },
   inactive: { bg: 'rgba(107,114,128,0.1)', text: '#6b7280', label: 'Inactive' },
   filled: { bg: 'rgba(99,102,241,0.1)', text: '#6366f1', label: 'Filled' },
+  expired: { bg: 'rgba(239,68,68,0.1)', text: '#dc2626', label: 'Expired' },
 };
+
+function expiryLabel(expiresAt: string): string {
+  const days = Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 86400000);
+  if (days <= 0) return 'Expires today';
+  if (days === 1) return 'Expires in 1 day';
+  return `Expires in ${days} days`;
+}
 
 export default function DashboardPage() {
   const { user, companyName, isApproved, loading: authLoading } = useAuth();
@@ -42,7 +51,7 @@ export default function DashboardPage() {
   async function loadData() {
     const { data: jobData } = await supabase
       .from('jobs')
-      .select('id, title, city, state, job_type, work_arrangement, status, created_at')
+      .select('id, title, city, state, job_type, work_arrangement, status, expires_at, created_at')
       .eq('employer_id', user!.id)
       .order('created_at', { ascending: false });
 
@@ -75,9 +84,25 @@ export default function DashboardPage() {
     setLoading(false);
   }
 
-  async function updateJobStatus(jobId: string, status: string) {
-    await supabase.from('jobs').update({ status }).eq('id', jobId);
-    setJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, status } : j));
+  async function updateJobStatus(job: Job, status: string) {
+    // Reactivating a job whose expiry has already passed must reset the clock,
+    // or the daily cron would re-expire it within 24h. Route that through renew.
+    if (status === 'active' && new Date(job.expires_at).getTime() <= Date.now()) {
+      return renewJob(job.id);
+    }
+    await supabase.from('jobs').update({ status }).eq('id', job.id);
+    setJobs((prev) => prev.map((j) => j.id === job.id ? { ...j, status } : j));
+  }
+
+  async function renewJob(jobId: string) {
+    const { data, error } = await supabase.rpc('renew_job', { p_job_id: jobId });
+    if (error || !data) {
+      console.error('Renew failed:', error?.message);
+      return;
+    }
+    setJobs((prev) => prev.map((j) =>
+      j.id === jobId ? { ...j, status: data.status, expires_at: data.expires_at } : j
+    ));
   }
 
   if (!user) return null;
@@ -179,6 +204,7 @@ export default function DashboardPage() {
                         <h3>{job.title}</h3>
                         <span className="dashboard-job-meta">
                           {job.city}, {job.state} &middot; {job.work_arrangement} &middot; {job.job_type} &middot; {timeLabel}
+                          {job.status === 'active' && <> &middot; {expiryLabel(job.expires_at)}</>}
                         </span>
                       </div>
                       <div className="dash-job-right">
@@ -195,16 +221,27 @@ export default function DashboardPage() {
                       </div>
                     </Link>
                     <div className="dash-job-status-controls">
-                      <select
-                        value={job.status}
-                        onChange={(e) => updateJobStatus(job.id, e.target.value)}
-                        className="status-select"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                        <option value="filled">Filled</option>
-                      </select>
+                      {job.status === 'expired' ? (
+                        // Expired is a terminal, system-set state — not a manual
+                        // option. Reactivation must go through renew (resets clock).
+                        <button
+                          className="btn btn-sm btn-primary"
+                          onClick={(e) => { e.stopPropagation(); renewJob(job.id); }}
+                        >
+                          Renew 30 days
+                        </button>
+                      ) : (
+                        <select
+                          value={job.status}
+                          onChange={(e) => updateJobStatus(job, e.target.value)}
+                          className="status-select"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <option value="active">Active</option>
+                          <option value="inactive">Inactive</option>
+                          <option value="filled">Filled</option>
+                        </select>
+                      )}
                     </div>
                   </div>
                 );

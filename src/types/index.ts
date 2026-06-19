@@ -26,8 +26,9 @@ export interface JobPosting {
   salary: string;
   jobType: 'full-time' | 'part-time' | 'contract';
   workArrangement: 'on-site' | 'remote' | 'hybrid';
-  status: 'active' | 'inactive' | 'filled';
+  status: 'active' | 'inactive' | 'filled' | 'expired';
   isFeatured: boolean;
+  expiresAt: string;
   location: {
     address: string;
     city: string;

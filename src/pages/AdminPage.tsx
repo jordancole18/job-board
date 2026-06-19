@@ -39,6 +39,7 @@ interface AdminJob {
   work_arrangement: string;
   is_featured: boolean;
   status: string;
+  expires_at: string;
   created_at: string;
 }
 
@@ -237,8 +238,18 @@ export default function AdminPage() {
 
 
   async function updateJobStatus(jobId: string, status: string) {
-    await supabase.from('jobs').update({ status }).eq('id', jobId);
-    setAllJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, status } : j));
+    // Reactivating a job that's already past its expiry resets the 30-day clock,
+    // otherwise the daily cron would re-expire it within 24h.
+    const existing = allJobs.find((j) => j.id === jobId);
+    const pastExpiry = existing?.expires_at
+      ? new Date(existing.expires_at).getTime() <= Date.now()
+      : false;
+    const patch: { status: string; expires_at?: string } =
+      status === 'active' && pastExpiry
+        ? { status, expires_at: new Date(Date.now() + 30 * 86400000).toISOString() }
+        : { status };
+    await supabase.from('jobs').update(patch).eq('id', jobId);
+    setAllJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, ...patch } : j));
   }
 
   async function startEditingJob(job: AdminJob) {
@@ -836,6 +847,8 @@ export default function AdminPage() {
                           <option value="active">Active</option>
                           <option value="inactive">Inactive</option>
                           <option value="filled">Filled</option>
+                          {/* System-set; shown so an expired job's value resolves. Switching to Active renews it. */}
+                          {job.status === 'expired' && <option value="expired">Expired</option>}
                         </select>
                         <button
                           className={`btn btn-sm ${job.is_featured ? 'btn-primary' : 'btn-outline'}`}

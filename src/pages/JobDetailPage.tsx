@@ -25,6 +25,7 @@ interface Job {
   lat: number;
   lng: number;
   status: string;
+  expires_at: string;
   created_at: string;
   job_tags: JobTag[];
 }
@@ -82,6 +83,7 @@ export default function JobDetailPage() {
     title: job.title,
     description: job.description,
     datePosted: job.created_at,
+    ...(job.expires_at ? { validThrough: new Date(job.expires_at).toISOString() } : {}),
     hiringOrganization: {
       '@type': 'Organization',
       name: job.company_name,
@@ -110,7 +112,7 @@ export default function JobDetailPage() {
         <meta property="og:description" content={`${job.work_arrangement} ${job.job_type} position in ${job.city}, ${job.state}. ${job.salary}.`} />
         <meta property="og:type" content="article" />
         {/* Only expose JobPosting structured data for live roles. Emitting it for
-            inactive/filled jobs risks Google indexing a closed listing. */}
+            expired/closed jobs risks a Google manual action. */}
         {isActive && <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>}
         {!isActive && <meta name="robots" content="noindex" />}
       </Helmet>

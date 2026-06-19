@@ -17,6 +17,7 @@ interface Job {
   job_type: string;
   work_arrangement: string;
   status: string;
+  expires_at: string;
   description: string;
   requirements: string;
   created_at: string;
@@ -120,8 +121,22 @@ export default function EmployerJobPage() {
   }
 
   async function updateJobStatus(status: string) {
+    // Reactivating a past-expiry job must reset the clock via renew, else the
+    // daily cron re-expires it within 24h.
+    if (status === 'active' && job && new Date(job.expires_at).getTime() <= Date.now()) {
+      return renewJob();
+    }
     await supabase.from('jobs').update({ status }).eq('id', id);
     setJob((prev) => prev ? { ...prev, status } : prev);
+  }
+
+  async function renewJob() {
+    const { data, error } = await supabase.rpc('renew_job', { p_job_id: id });
+    if (error || !data) {
+      console.error('Renew failed:', error?.message);
+      return;
+    }
+    setJob((prev) => prev ? { ...prev, status: data.status, expires_at: data.expires_at } : prev);
   }
 
   async function startEditing() {
@@ -340,21 +355,33 @@ export default function EmployerJobPage() {
               <span>{job.work_arrangement} &middot; {job.job_type}</span>
               <span>{job.salary}</span>
               <span>Posted {timeLabel}</span>
+              {job.status === 'active' && (
+                <span>
+                  Expires {new Date(job.expires_at).toLocaleDateString()}
+                </span>
+              )}
+              {job.status === 'expired' && <span className="ej-expired-flag">Expired</span>}
             </div>
           </div>
           <div className="ej-header-actions">
             <button onClick={startEditing} className="btn btn-outline">
               <Pencil size={14} /> Edit
             </button>
-            <select
-              value={job.status}
-              onChange={(e) => updateJobStatus(e.target.value)}
-              className="status-select"
-            >
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="filled">Filled</option>
-            </select>
+            {job.status === 'expired' ? (
+              <button onClick={renewJob} className="btn btn-primary">
+                Renew 30 days
+              </button>
+            ) : (
+              <select
+                value={job.status}
+                onChange={(e) => updateJobStatus(e.target.value)}
+                className="status-select"
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="filled">Filled</option>
+              </select>
+            )}
             <button onClick={handleDelete} className="btn btn-danger">
               <Trash2 size={14} /> Delete Job
             </button>

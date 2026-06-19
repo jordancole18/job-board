@@ -1107,6 +1107,10 @@ select.input {
   font-weight: 600;
   color: #b91c1c;
 }
+.ej-expired-flag {
+  color: #dc2626;
+  font-weight: 600;
+}
 
 .cta-hint {
   font-size: 0.8rem;
