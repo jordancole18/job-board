@@ -68,11 +68,13 @@ export default function HomePage() {
   }
 
   const filtered = useMemo(() => jobs.filter((job) => {
+    const s = search.toLowerCase();
     const matchesSearch =
       !search ||
-      job.title.toLowerCase().includes(search.toLowerCase()) ||
-      job.company_name.toLowerCase().includes(search.toLowerCase()) ||
-      job.description.toLowerCase().includes(search.toLowerCase());
+      job.title.toLowerCase().includes(s) ||
+      job.company_name.toLowerCase().includes(s) ||
+      job.description.toLowerCase().includes(s) ||
+      (job.job_tags ?? []).some((jt) => jt.tags?.name?.toLowerCase().includes(s));
     const matchesLocation =
       !locationFilter ||
       job.city.toLowerCase().includes(locationFilter.toLowerCase()) ||
