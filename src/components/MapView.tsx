@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
-import { Icon, DivIcon } from 'leaflet';
+import { useEffect, useRef } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { Icon, DivIcon, type LeafletMouseEvent } from 'leaflet';
 import { Link } from 'react-router-dom';
 import 'leaflet/dist/leaflet.css';
+import type { LatLngBounds } from './LocationAutocomplete';
 
 interface Job {
   id: string;
@@ -55,11 +56,26 @@ interface Props {
   jobs: Job[];
   center?: [number, number];
   zoom?: number;
+  bounds?: LatLngBounds | null;
+  isMobile?: boolean;
 }
 
-function FlyToHandler({ center, zoom }: { center: [number, number]; zoom: number }) {
+const US_CENTER: [number, number] = [39.8283, -98.5795];
+// Cap how many jobs a single co-located popup lists before collapsing to a count.
+const MAX_POPUP_JOBS = 8;
+
+function FlyToHandler({
+  center,
+  zoom,
+  bounds,
+}: {
+  center: [number, number];
+  zoom: number;
+  bounds?: LatLngBounds | null;
+}) {
   const map = useMap();
   const isFirstRun = useRef(true);
+  const boundsKey = bounds ? bounds.flat().join(',') : '';
   useEffect(() => {
     // MapContainer's center/zoom props already position the map on mount.
     // Skipping the initial flyTo avoids a Leaflet internal projection bug
@@ -70,43 +86,19 @@ function FlyToHandler({ center, zoom }: { center: [number, number]; zoom: number
       map.invalidateSize();
       return;
     }
+    map.invalidateSize();
+    // Prefer fitting place bounds (e.g. a whole state) when provided.
+    if (bounds && bounds.flat().every(Number.isFinite)) {
+      map.flyToBounds(bounds, { maxZoom: 13, padding: [40, 40], duration: 1.2 });
+      return;
+    }
     if (!Number.isFinite(center[0]) || !Number.isFinite(center[1]) || !Number.isFinite(zoom)) {
       return;
     }
-    map.invalidateSize();
     map.flyTo(center, zoom, { duration: 1.2 });
-  }, [center[0], center[1], zoom]);
+  }, [center[0], center[1], zoom, boundsKey]);
   return null;
 }
-
-// Manually spiderfies an expanded group: flies the map to it and collapses on zoom-out.
-function ExpansionController({
-  target,
-  onCollapse,
-}: {
-  target: [number, number] | null;
-  onCollapse: () => void;
-}) {
-  const map = useMap();
-  useEffect(() => {
-    if (!target) return;
-    if (!Number.isFinite(target[0]) || !Number.isFinite(target[1])) return;
-    const targetZoom = Math.max(map.getZoom(), EXPANDED_ZOOM);
-    map.flyTo(target, targetZoom, { duration: 0.5 });
-  }, [target?.[0], target?.[1]]);
-
-  useMapEvents({
-    zoomend: () => {
-      if (map.getZoom() < EXPANDED_ZOOM - 1) onCollapse();
-    },
-  });
-  return null;
-}
-
-const US_CENTER: [number, number] = [39.8283, -98.5795];
-const EXPANDED_ZOOM = 15;
-// At zoom 15, ~0.0009° latitude ≈ 100m ≈ 80px — enough to separate markers visibly.
-const SPREAD_RADIUS_DEG = 0.0009;
 
 function toCoord(v: unknown): number | null {
   if (v === null || v === undefined || v === '') return null;
@@ -120,22 +112,7 @@ function toLatLng(lat: unknown, lng: unknown): [number, number] | null {
   return a !== null && b !== null ? [a, b] : null;
 }
 
-function spreadOffsets(center: [number, number], count: number): [number, number][] {
-  // Arrange markers in a circle around the shared location, starting at the top.
-  // Longitude offset shrinks toward the poles so the circle stays circular on screen.
-  const lngScale = 1 / Math.max(Math.cos((center[0] * Math.PI) / 180), 0.1);
-  return Array.from({ length: count }, (_, i) => {
-    const angle = (2 * Math.PI * i) / count - Math.PI / 2;
-    return [
-      center[0] + SPREAD_RADIUS_DEG * Math.sin(angle),
-      center[1] + SPREAD_RADIUS_DEG * Math.cos(angle) * lngScale,
-    ] as [number, number];
-  });
-}
-
-export default function MapView({ jobs, center = US_CENTER, zoom = 4 }: Props) {
-  const [expandedKey, setExpandedKey] = useState<string | null>(null);
-
+export default function MapView({ jobs, center = US_CENTER, zoom = 4, bounds = null, isMobile = false }: Props) {
   const validMarkers = jobs
     .map((job) => {
       const pos = toLatLng(job.lat, job.lng);
@@ -156,50 +133,66 @@ export default function MapView({ jobs, center = US_CENTER, zoom = 4 }: Props) {
     else groups.set(key, { pos, jobs: [job] });
   }
 
-  const expandedGroup = expandedKey ? groups.get(expandedKey) ?? null : null;
-
-  const renderJobMarker = (job: Job, pos: [number, number]) => (
-    <Marker key={job.id} position={pos} icon={jobIcon}>
-      <Popup>
-        <div className="map-popup">
-          <strong>{job.title}</strong>
-          <p>{job.company_name}</p>
-          <p>{job.city}, {job.state}</p>
-          <p>{job.salary}</p>
-          <Link to={`/jobs/${job.id}`}>View Details &rarr;</Link>
-        </div>
-      </Popup>
-    </Marker>
-  );
+  // On non-touch devices, open the popup on hover; tap/click works everywhere.
+  // We deliberately do NOT close on mouseout so the cursor can reach the popup's
+  // links without it flickering shut (a classic Leaflet hover pitfall).
+  const hoverHandlers = isMobile
+    ? undefined
+    : { mouseover: (e: LeafletMouseEvent) => e.target.openPopup() };
 
   const renderedMarkers: React.ReactNode[] = [];
   for (const [key, group] of groups) {
     if (group.jobs.length === 1) {
-      renderedMarkers.push(renderJobMarker(group.jobs[0], group.pos));
+      const job = group.jobs[0];
+      renderedMarkers.push(
+        <Marker key={job.id} position={group.pos} icon={jobIcon} eventHandlers={hoverHandlers}>
+          <Popup>
+            <div className="map-popup">
+              <strong>{job.title}</strong>
+              <p>{job.company_name}</p>
+              <p>{job.city}, {job.state}</p>
+              <p>{job.salary}</p>
+              <Link to={`/jobs/${job.id}`}>View Details &rarr;</Link>
+            </div>
+          </Popup>
+        </Marker>
+      );
       continue;
     }
-    if (expandedKey === key) {
-      const offsets = spreadOffsets(group.pos, group.jobs.length);
-      group.jobs.forEach((job, i) => renderedMarkers.push(renderJobMarker(job, offsets[i])));
-      continue;
-    }
+
+    // Co-located jobs: one badge whose popup lists every job at this point.
+    const shown = group.jobs.slice(0, MAX_POPUP_JOBS);
+    const extra = group.jobs.length - shown.length;
     renderedMarkers.push(
       <Marker
         key={`badge-${key}`}
         position={group.pos}
         icon={makeBadgeIcon(group.jobs.length)}
-        eventHandlers={{ click: () => setExpandedKey(key) }}
-      />
+        eventHandlers={hoverHandlers}
+      >
+        <Popup>
+          <div className="map-popup map-popup-list">
+            <strong>{group.jobs.length} jobs at {group.jobs[0].city}, {group.jobs[0].state}</strong>
+            <ul className="map-popup-jobs">
+              {shown.map((job) => (
+                <li key={job.id}>
+                  <Link to={`/jobs/${job.id}`}>{job.title}</Link>
+                  <span className="map-popup-job-company">{job.company_name}</span>
+                </li>
+              ))}
+            </ul>
+            {extra > 0 && (
+              <p className="map-popup-more">+{extra} more at this location</p>
+            )}
+          </div>
+        </Popup>
+      </Marker>
     );
   }
 
   return (
     <MapContainer center={safeCenter} zoom={safeZoom} className="map-container">
-      <FlyToHandler center={safeCenter} zoom={safeZoom} />
-      <ExpansionController
-        target={expandedGroup ? expandedGroup.pos : null}
-        onCollapse={() => setExpandedKey(null)}
-      />
+      <FlyToHandler center={safeCenter} zoom={safeZoom} bounds={bounds} />
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
         url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"

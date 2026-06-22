@@ -6,16 +6,18 @@ import { supabase } from '../utils/supabase';
 import { haversineDistance, radiusToZoom } from '../utils/distance';
 import { getArrangementStyle, getJobTypeStyle, JOB_TYPE_OPTIONS, ARRANGEMENT_OPTIONS } from '../constants/jobStyles';
 import SafeMapView from '../components/SafeMapView';
-import LocationAutocomplete from '../components/LocationAutocomplete';
+import LocationAutocomplete, { type LatLngBounds } from '../components/LocationAutocomplete';
 
 interface JobTag {
   tag_id: string;
+  tags: { name: string } | null;
 }
 
 interface Job {
   id: string;
   title: string;
   company_name: string;
+  description: string;
   city: string;
   state: string;
   salary: string;
@@ -61,6 +63,10 @@ export default function MapPage() {
   const [locationLabel, setLocationLabel] = useState('');
   const [mapCenter, setMapCenter] = useState<[number, number]>(US_CENTER);
   const [mapZoom, setMapZoom] = useState(4);
+  // Bounds of the selected place (e.g. a whole state). When set and no radius is
+  // chosen, the map fits these bounds so a state query frames the state, not a city.
+  const [locationBounds, setLocationBounds] = useState<LatLngBounds | null>(null);
+  const [mapBounds, setMapBounds] = useState<LatLngBounds | null>(null);
   const [hoveredJob, setHoveredJob] = useState<string | null>(null);
   const [mobileView, setMobileView] = useState<'list' | 'map'>('list');
   const [isMobile, setIsMobile] = useState(() =>
@@ -81,10 +87,12 @@ export default function MapPage() {
   useEffect(() => {
     async function load() {
       const [jobsRes, tagsRes] = await Promise.all([
-        supabase.from('jobs').select('id, title, company_name, city, state, salary, job_type, work_arrangement, lat, lng, job_tags(tag_id)').eq('status', 'active'),
+        supabase.from('jobs').select('id, title, company_name, description, city, state, salary, job_type, work_arrangement, lat, lng, job_tags(tag_id, tags(name))').eq('status', 'active'),
         supabase.from('tags').select('id, name').order('name'),
       ]);
-      if (jobsRes.data) setJobs(jobsRes.data as Job[]);
+      // Supabase infers the nested tags() relation as an array, but a to-one
+      // FK returns a single object at runtime — cast through unknown to match.
+      if (jobsRes.data) setJobs(jobsRes.data as unknown as Job[]);
       if (tagsRes.data) setTags(tagsRes.data);
       setLoading(false);
     }
@@ -104,43 +112,74 @@ export default function MapPage() {
             const lng = parseFloat(data[0].lon);
             const parts = data[0].display_name.split(',');
             const label = parts.slice(0, 2).map((p: string) => p.trim()).join(', ');
+            const bb: string[] | undefined = data[0].boundingbox;
+            const bounds: LatLngBounds | null =
+              bb && bb.length >= 4 && bb.map(Number).every(Number.isFinite)
+                ? [[Number(bb[0]), Number(bb[2])], [Number(bb[1]), Number(bb[3])]]
+                : null;
             setLocationCenter([lat, lng]);
             setLocationLabel(label);
+            setLocationBounds(bounds);
             setMapCenter([lat, lng]);
-            setMapZoom(10);
+            if (bounds) setMapBounds(bounds);
+            else setMapZoom(10);
           }
         })
         .catch(() => {});
     }
   }, []);
 
-  function handleLocationSelect(lat: number, lng: number, label: string) {
+  function handleLocationSelect(lat: number, lng: number, label: string, bounds: LatLngBounds | null) {
     setLocationCenter([lat, lng]);
     setLocationLabel(label);
-    const zoom = radius > 0 ? radiusToZoom(radius) : 10;
+    setLocationBounds(bounds);
     setMapCenter([lat, lng]);
-    setMapZoom(zoom);
+    if (radius > 0) {
+      // Radius selection wins: zoom to the radius around the point.
+      setMapBounds(null);
+      setMapZoom(radiusToZoom(radius));
+    } else if (bounds) {
+      // No radius: fit the place's bounds (state -> state view, city -> city view).
+      setMapBounds(bounds);
+    } else {
+      setMapBounds(null);
+      setMapZoom(10);
+    }
   }
 
   function handleLocationClear() {
     setLocationCenter(null);
     setLocationLabel('');
+    setLocationBounds(null);
+    setMapBounds(null);
     setMapCenter(US_CENTER);
     setMapZoom(4);
   }
 
   function handleRadiusChange(value: number) {
     setRadius(value);
-    if (locationCenter) {
-      setMapZoom(value > 0 ? radiusToZoom(value) : 10);
+    if (!locationCenter) return;
+    if (value > 0) {
+      // Radius takes precedence over the place bounds.
+      setMapBounds(null);
+      setMapZoom(radiusToZoom(value));
+    } else if (locationBounds) {
+      // Cleared the radius: re-fit the place's bounds.
+      setMapBounds(locationBounds);
+    } else {
+      setMapBounds(null);
+      setMapZoom(10);
     }
   }
 
   const filtered = jobs.filter((job) => {
+    const kw = keyword.toLowerCase();
     const matchesKeyword =
       !keyword ||
-      job.title.toLowerCase().includes(keyword.toLowerCase()) ||
-      job.company_name.toLowerCase().includes(keyword.toLowerCase());
+      job.title.toLowerCase().includes(kw) ||
+      job.company_name.toLowerCase().includes(kw) ||
+      (job.description ?? '').toLowerCase().includes(kw) ||
+      (job.job_tags ?? []).some((jt) => jt.tags?.name?.toLowerCase().includes(kw));
     const matchesType = !typeFilter || job.job_type === typeFilter;
     const matchesArrangement = !arrangementFilter || job.work_arrangement === arrangementFilter;
     const matchesTag = !tagFilter || job.job_tags?.some((jt) => jt.tag_id === tagFilter);
@@ -206,7 +245,7 @@ export default function MapPage() {
               <Search size={16} className="explore-search-icon" />
               <input
                 type="text"
-                placeholder="Filter by job title or company..."
+                placeholder="Filter by title, company, or category..."
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
                 className="explore-search-input"
@@ -318,7 +357,7 @@ export default function MapPage() {
         {loading ? (
           <div className="loading">Loading map...</div>
         ) : mapVisible ? (
-          <SafeMapView jobs={filtered} center={mapCenter} zoom={mapZoom} />
+          <SafeMapView jobs={filtered} center={mapCenter} zoom={mapZoom} bounds={mapBounds} isMobile={isMobile} />
         ) : null}
       </div>
     </div>

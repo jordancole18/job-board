@@ -5,11 +5,23 @@ interface Suggestion {
   display_name: string;
   lat: string;
   lon: string;
+  // Nominatim bbox: [south_lat, north_lat, west_lng, east_lng] as strings
+  boundingbox?: string[];
 }
 
+// Leaflet bounds: [[southLat, westLng], [northLat, eastLng]]
+export type LatLngBounds = [[number, number], [number, number]];
+
 interface Props {
-  onSelect: (lat: number, lng: number, label: string) => void;
+  onSelect: (lat: number, lng: number, label: string, bounds: LatLngBounds | null) => void;
   onClear: () => void;
+}
+
+function parseBounds(bbox?: string[]): LatLngBounds | null {
+  if (!bbox || bbox.length < 4) return null;
+  const [south, north, west, east] = bbox.map(Number);
+  if (![south, north, west, east].every(Number.isFinite)) return null;
+  return [[south, west], [north, east]];
 }
 
 export default function LocationAutocomplete({ onSelect, onClear }: Props) {
@@ -67,7 +79,7 @@ export default function LocationAutocomplete({ onSelect, onClear }: Props) {
     setSelectedLabel(short);
     setOpen(false);
     setSuggestions([]);
-    onSelect(parseFloat(s.lat), parseFloat(s.lon), short);
+    onSelect(parseFloat(s.lat), parseFloat(s.lon), short, parseBounds(s.boundingbox));
   }
 
   function handleClear() {

@@ -1291,6 +1291,38 @@ select.input {
   border: none;
   cursor: pointer;
 }
+.map-popup-list {
+  min-width: 200px;
+}
+.map-popup-jobs {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.map-popup-jobs li {
+  padding: 6px 0;
+  border-top: 1px solid var(--border, #e5e7eb);
+}
+.map-popup-jobs li:first-child {
+  border-top: none;
+}
+.map-popup-jobs a {
+  display: block;
+  margin: 0;
+  font-weight: 600;
+}
+.map-popup-job-company {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+.map-popup-more {
+  margin: 8px 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
 
 /* ================================================
    DASHBOARD
