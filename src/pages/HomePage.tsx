@@ -162,7 +162,7 @@ export default function HomePage() {
             </button>
           </div>
           <div className="hero-search-actions">
-            <button className="hero-advanced-link" onClick={() => navigate('/map')}>
+            <button className="hero-advanced-link" onClick={() => navigate('/map?view=map')}>
               <Map size={14} /> Search By Map
             </button>
           </div>
