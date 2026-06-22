@@ -1095,6 +1095,19 @@ select.input {
   border-top: 1px solid var(--border-light);
 }
 
+.job-detail-closed {
+  margin-top: 32px;
+  padding: 20px 24px;
+  border-top: 1px solid var(--border-light);
+  background: rgba(239, 68, 68, 0.06);
+  border-radius: 8px;
+}
+.job-detail-closed p {
+  margin: 0 0 12px;
+  font-weight: 600;
+  color: #b91c1c;
+}
+
 .cta-hint {
   font-size: 0.8rem;
   color: var(--text-muted);

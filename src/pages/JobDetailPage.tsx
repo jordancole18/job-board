@@ -24,6 +24,7 @@ interface Job {
   state: string;
   lat: number;
   lng: number;
+  status: string;
   created_at: string;
   job_tags: JobTag[];
 }
@@ -60,6 +61,7 @@ export default function JobDetailPage() {
   if (loading) return <div className="page"><div className="loading">Loading...</div></div>;
   if (!job) return <div className="page"><div className="empty-state"><h3>Job not found</h3><Link to="/">Back to jobs</Link></div></div>;
 
+  const isActive = job.status === 'active';
   const daysAgo = Math.floor((Date.now() - new Date(job.created_at).getTime()) / 86400000);
   const timeLabel = daysAgo === 0 ? 'Today' : daysAgo === 1 ? '1 day ago' : `${daysAgo} days ago`;
   const avatarColor = AVATAR_COLORS[job.company_name.charCodeAt(0) % AVATAR_COLORS.length];
@@ -107,7 +109,10 @@ export default function JobDetailPage() {
         <meta property="og:title" content={`${job.title} at ${job.company_name}`} />
         <meta property="og:description" content={`${job.work_arrangement} ${job.job_type} position in ${job.city}, ${job.state}. ${job.salary}.`} />
         <meta property="og:type" content="article" />
-        <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
+        {/* Only expose JobPosting structured data for live roles. Emitting it for
+            inactive/filled jobs risks Google indexing a closed listing. */}
+        {isActive && <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>}
+        {!isActive && <meta name="robots" content="noindex" />}
       </Helmet>
       <Link to="/" className="back-link">
         <ArrowLeft size={16} /> Back to jobs
@@ -167,12 +172,19 @@ export default function JobDetailPage() {
             <p>{job.requirements}</p>
           </div>
 
-          <div className="job-detail-cta">
-            <Link to={`/jobs/${id}/apply`} className="btn btn-primary btn-apply">
-              Apply Now
-            </Link>
-            <p className="cta-hint">Takes less than 2 minutes</p>
-          </div>
+          {isActive ? (
+            <div className="job-detail-cta">
+              <Link to={`/jobs/${id}/apply`} className="btn btn-primary btn-apply">
+                Apply Now
+              </Link>
+              <p className="cta-hint">Takes less than 2 minutes</p>
+            </div>
+          ) : (
+            <div className="job-detail-closed">
+              <p>This position is no longer accepting applications.</p>
+              <Link to="/" className="btn btn-outline">Browse open jobs</Link>
+            </div>
+          )}
         </div>
 
         <div className="job-detail-sidebar">
