@@ -12,6 +12,7 @@ interface Job {
   job_type: string;
   city: string;
   state: string;
+  status: string;
 }
 
 const AVATAR_COLORS = [
@@ -39,7 +40,7 @@ export default function ApplyPage() {
     async function load() {
       const { data } = await supabase
         .from('jobs')
-        .select('id, title, company_name, salary, job_type, city, state')
+        .select('id, title, company_name, salary, job_type, city, state, status')
         .eq('id', id)
         .single();
       setJob(data);
@@ -125,6 +126,17 @@ export default function ApplyPage() {
 
   if (loading) return <div className="page"><div className="loading">Loading...</div></div>;
   if (!job) return <div className="page"><div className="empty-state"><h3>Job not found</h3><Link to="/">Back to jobs</Link></div></div>;
+  if (job.status !== 'active') {
+    return (
+      <div className="page">
+        <div className="empty-state">
+          <h3>This position is no longer accepting applications</h3>
+          <p>This posting has been closed or filled.</p>
+          <Link to="/" className="btn btn-primary">Browse open jobs</Link>
+        </div>
+      </div>
+    );
+  }
 
   const avatarColor = AVATAR_COLORS[job.company_name.charCodeAt(0) % AVATAR_COLORS.length];
 
