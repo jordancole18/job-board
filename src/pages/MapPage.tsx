@@ -68,7 +68,11 @@ export default function MapPage() {
   const [locationBounds, setLocationBounds] = useState<LatLngBounds | null>(null);
   const [mapBounds, setMapBounds] = useState<LatLngBounds | null>(null);
   const [hoveredJob, setHoveredJob] = useState<string | null>(null);
-  const [mobileView, setMobileView] = useState<'list' | 'map'>('list');
+  // Land on the map pane when arriving via "Search By Map" (?view=map);
+  // keyword/category entries still default to the list on mobile.
+  const [mobileView, setMobileView] = useState<'list' | 'map'>(
+    searchParams.get('view') === 'map' ? 'map' : 'list'
+  );
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches
   );
