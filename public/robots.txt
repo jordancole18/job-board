@@ -6,4 +6,4 @@ Disallow: /post-job
 Disallow: /employer/
 Disallow: /auth
 
-Sitemap: https://associationcareers.com/sitemap.xml
+Sitemap: https://associationcareers.realestate/sitemap.xml
