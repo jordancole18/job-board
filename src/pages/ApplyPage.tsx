@@ -131,7 +131,7 @@ export default function ApplyPage() {
       <div className="page">
         <div className="empty-state">
           <h3>This position is no longer accepting applications</h3>
-          <p>This posting has been closed or filled.</p>
+          <p>This posting has been closed or has expired.</p>
           <Link to="/" className="btn btn-primary">Browse open jobs</Link>
         </div>
       </div>
