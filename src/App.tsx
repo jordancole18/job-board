@@ -17,6 +17,12 @@ import EmployerJobPage from './pages/EmployerJobPage';
 import SubmitResumePage from './pages/SubmitResumePage';
 import AdminPage from './pages/AdminPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import usePageTracking from './hooks/usePageTracking';
+
+function RouteTracker() {
+  usePageTracking();
+  return null;
+}
 
 export default function App() {
   const [profileOpen, setProfileOpen] = useState(false);
@@ -25,6 +31,7 @@ export default function App() {
     <HelmetProvider>
       <BrowserRouter>
         <AuthProvider>
+          <RouteTracker />
           <Navbar onEditProfile={() => setProfileOpen(true)} />
           <ErrorBoundary>
             <Routes>
