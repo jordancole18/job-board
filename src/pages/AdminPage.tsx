@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Tag, FileText, Star, Plus, Trash2, Download, Eye, Pencil, Check, X, Users, ShieldCheck, ShieldX, Crown, Briefcase, Settings, Search, Ban } from 'lucide-react';
+import { Tag, FileText, Star, Plus, Trash2, Download, Eye, Pencil, Check, X, Users, ShieldCheck, ShieldX, Crown, Briefcase, Settings, Search, Ban, Mail } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabase';
 import { JOB_TYPE_OPTIONS, ARRANGEMENT_OPTIONS } from '../constants/jobStyles';
@@ -60,6 +60,14 @@ interface Employer {
   created_at: string;
 }
 
+interface AuthUser {
+  id: string;
+  email: string | null;
+  email_confirmed_at: string | null;
+  created_at: string;
+  last_sign_in_at: string | null;
+}
+
 const AVATAR_COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316',
   '#eab308', '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6',
@@ -88,6 +96,9 @@ export default function AdminPage() {
   // Employers state
   const [employers, setEmployers] = useState<Employer[]>([]);
   const [employerSearch, setEmployerSearch] = useState('');
+  // Auth users (from Supabase Auth) — used to show email-verification status
+  // and surface signups that haven't verified yet (no employer row exists).
+  const [authUsers, setAuthUsers] = useState<AuthUser[]>([]);
 
   // Job editing state
   const [editingJobId, setEditingJobId] = useState<string | null>(null);
@@ -118,6 +129,7 @@ export default function AdminPage() {
     loadSubmissions();
     loadJobs();
     loadEmployers();
+    loadAuthUsers();
     loadSettings();
   }, [user, isAdmin, authLoading]);
 
@@ -149,6 +161,13 @@ export default function AdminPage() {
       .select('*')
       .order('created_at', { ascending: false });
     if (data) setEmployers(data);
+  }
+
+  async function loadAuthUsers() {
+    const { data, error } = await supabase.functions.invoke('list-users');
+    if (error || (data && (data as { error?: string }).error)) return;
+    const users = (data as { users?: AuthUser[] }).users;
+    if (users) setAuthUsers(users);
   }
 
   async function toggleApproval(employerId: string, currentlyApproved: boolean) {
@@ -187,6 +206,20 @@ export default function AdminPage() {
       return;
     }
     setEmployers((prev) => prev.filter((e) => e.id !== employerId));
+    setAuthUsers((prev) => prev.filter((u) => u.id !== emp.user_id));
+  }
+
+  // Delete an auth user that has no employer profile yet (e.g. never verified).
+  async function deleteAuthUser(userId: string) {
+    if (!confirm('Permanently delete this unverified account? This cannot be undone.')) return;
+    const { data, error } = await supabase.functions.invoke('delete-account', {
+      body: { userId },
+    });
+    if (error || (data && (data as { error?: string }).error)) {
+      alert('Failed to delete account: ' + (error?.message || (data as { error?: string }).error));
+      return;
+    }
+    setAuthUsers((prev) => prev.filter((u) => u.id !== userId));
   }
 
   async function addTag() {
@@ -362,6 +395,19 @@ export default function AdminPage() {
 
   if (authLoading || !user || !isAdmin) return <div className="page"><div className="loading">Loading...</div></div>;
 
+  // Map auth status by user_id so employer rows can show a verification badge,
+  // and surface auth users that never created an employer profile (usually
+  // because they haven't verified their email yet).
+  const authByUserId = new Map(authUsers.map((u) => [u.id, u]));
+  const employerUserIds = new Set(employers.map((e) => e.user_id));
+  const pendingUsers = authUsers
+    .filter((u) => !employerUserIds.has(u.id))
+    .filter((u) => {
+      if (!employerSearch) return true;
+      return (u.email || '').toLowerCase().includes(employerSearch.toLowerCase());
+    })
+    .sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+
   return (
     <div className="page">
       <div className="admin-header">
@@ -422,7 +468,7 @@ export default function AdminPage() {
               />
             </div>
           </div>
-          {employers.length === 0 ? (
+          {employers.length === 0 && pendingUsers.length === 0 ? (
             <div className="empty-state">
               <h3>No employer accounts yet</h3>
             </div>
@@ -437,6 +483,8 @@ export default function AdminPage() {
                 })
                 .map((emp) => {
                 const color = AVATAR_COLORS[emp.company_name.charCodeAt(0) % AVATAR_COLORS.length];
+                const au = authByUserId.get(emp.user_id);
+                const emailVerified = au ? !!au.email_confirmed_at : null;
                 return (
                   <div key={emp.id} className={`admin-employer-item ${!emp.is_approved ? 'admin-employer-pending' : ''}`} style={emp.is_disabled ? { opacity: 0.5 } : {}}>
                     {editingEmployerId === emp.id ? (
@@ -515,6 +563,16 @@ export default function AdminPage() {
                                 <Ban size={10} /> Disabled
                               </span>
                             )}
+                            {emailVerified === false && (
+                              <span className="status-badge" style={{ backgroundColor: 'rgba(245,158,11,0.12)', color: '#b45309', marginLeft: '0.5rem', fontSize: '0.7rem' }}>
+                                <Mail size={10} /> Awaiting verification
+                              </span>
+                            )}
+                            {emailVerified === true && (
+                              <span className="status-badge" style={{ backgroundColor: 'rgba(56,182,83,0.1)', color: '#2d9a46', marginLeft: '0.5rem', fontSize: '0.7rem' }}>
+                                <Check size={10} /> Verified
+                              </span>
+                            )}
                             <span className="ej-app-email">
                               {emp.email && <>{emp.email} · </>}
                               Joined {new Date(emp.created_at).toLocaleDateString()}
@@ -577,6 +635,39 @@ export default function AdminPage() {
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {pendingUsers.length > 0 && (
+            <div style={{ marginTop: '1.5rem' }}>
+              <h3 style={{ fontSize: '0.9rem', color: 'var(--text-muted)', margin: '0 0 0.75rem' }}>
+                Pending email verification ({pendingUsers.length})
+              </h3>
+              <div className="admin-employers-list">
+                {pendingUsers.map((u) => (
+                  <div key={u.id} className="admin-employer-item admin-employer-pending">
+                    <div className="admin-employer-info">
+                      <div className="ej-app-avatar" style={{ backgroundColor: '#b45309' }}>
+                        {(u.email || '?').charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <strong>{u.email || 'Unknown email'}</strong>
+                        <span className="status-badge" style={{ backgroundColor: 'rgba(245,158,11,0.12)', color: '#b45309', marginLeft: '0.5rem', fontSize: '0.7rem' }}>
+                          <Mail size={10} /> Awaiting verification
+                        </span>
+                        <span className="ej-app-email">
+                          Signed up {new Date(u.created_at).toLocaleDateString()} · Hasn't confirmed email
+                        </span>
+                      </div>
+                    </div>
+                    <div className="admin-employer-actions">
+                      <button className="btn btn-sm btn-danger" onClick={() => deleteAuthUser(u.id)}>
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
