@@ -1,12 +1,16 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Briefcase, Mail, KeyRound } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabase';
 import { US_STATES } from '../constants/usStates';
 
 export default function AuthPage() {
-  const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>('signin');
+  const [searchParams] = useSearchParams();
+  const initialMode = (['signin', 'signup', 'forgot'] as const).find(
+    (m) => m === searchParams.get('mode')
+  ) ?? 'signin';
+  const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [companyName, setCompanyName] = useState('');

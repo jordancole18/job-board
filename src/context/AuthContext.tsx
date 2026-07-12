@@ -177,6 +177,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (insertError) return insertError.message;
       setCompanyName(fields.companyName);
     } else if (data.user) {
+      // With email confirmation on, signing up with an already-registered,
+      // confirmed email returns an obfuscated user with an empty `identities`
+      // array and sends no email. Detect that and email the real owner a
+      // "you already have an account" notice, while keeping the UI generic.
+      const alreadyRegistered = (data.user.identities?.length ?? 0) === 0;
+      if (alreadyRegistered) {
+        // Fire-and-forget: the function verifies the account exists server-side
+        // and only emails real account holders. Don't block or change the UI.
+        supabase.functions
+          .invoke('notify-existing-account', { body: { email } })
+          .catch((e) => console.error('[AuthContext] existing-account notice failed:', e));
+      }
       // Email confirmation required — metadata is stored on the user,
       // employer record will be created when they confirm and the useEffect runs
       return 'check_email';
