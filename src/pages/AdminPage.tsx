@@ -395,18 +395,33 @@ export default function AdminPage() {
 
   if (authLoading || !user || !isAdmin) return <div className="page"><div className="loading">Loading...</div></div>;
 
-  // Map auth status by user_id so employer rows can show a verification badge,
-  // and surface auth users that never created an employer profile (usually
-  // because they haven't verified their email yet).
+  // One unified user list. Supabase Auth is the source of truth for who
+  // exists and their email-verification status; the employer row (when it
+  // exists) adds profile/approval/admin data. Merge both keyed by user id so
+  // a single list renders even if one source is briefly unavailable.
   const authByUserId = new Map(authUsers.map((u) => [u.id, u]));
-  const employerUserIds = new Set(employers.map((e) => e.user_id));
-  const pendingUsers = authUsers
-    .filter((u) => !employerUserIds.has(u.id))
-    .filter((u) => {
+  const rowByUserId = new Map<string, { userId: string; emp: Employer | null; au: AuthUser | null }>();
+  employers.forEach((emp) => rowByUserId.set(emp.user_id, { userId: emp.user_id, emp, au: authByUserId.get(emp.user_id) ?? null }));
+  authUsers.forEach((au) => { if (!rowByUserId.has(au.id)) rowByUserId.set(au.id, { userId: au.id, emp: null, au }); });
+
+  const userRows = [...rowByUserId.values()]
+    .filter(({ emp, au }) => {
       if (!employerSearch) return true;
-      return (u.email || '').toLowerCase().includes(employerSearch.toLowerCase());
+      const q = employerSearch.toLowerCase();
+      return (emp?.company_name.toLowerCase().includes(q) ?? false) ||
+        (au?.email || emp?.email || '').toLowerCase().includes(q);
     })
-    .sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+    .sort((a, b) => {
+      // Unverified accounts first (they need attention), then newest first.
+      const av = a.au && !a.au.email_confirmed_at ? 0 : 1;
+      const bv = b.au && !b.au.email_confirmed_at ? 0 : 1;
+      if (av !== bv) return av - bv;
+      const ad = a.emp?.created_at || a.au?.created_at || '';
+      const bd = b.emp?.created_at || b.au?.created_at || '';
+      return ad < bd ? 1 : -1;
+    });
+
+  const unverifiedCount = userRows.filter((r) => r.au && !r.au.email_confirmed_at).length;
 
   return (
     <div className="page">
@@ -420,7 +435,7 @@ export default function AdminPage() {
           className={`dashboard-tab ${activeTab === 'employers' ? 'dashboard-tab-active' : ''}`}
           onClick={() => setActiveTab('employers')}
         >
-          <Users size={16} /> Employers
+          <Users size={16} /> Users
           {employers.filter((e) => !e.is_approved && !e.is_admin).length > 0 && (
             <span className="tab-badge">{employers.filter((e) => !e.is_approved && !e.is_admin).length}</span>
           )}
@@ -468,25 +483,60 @@ export default function AdminPage() {
               />
             </div>
           </div>
-          {employers.length === 0 && pendingUsers.length === 0 ? (
+          {unverifiedCount > 0 && (
+            <p style={{ margin: '0 0 1rem', fontSize: '0.85rem', color: '#b45309' }}>
+              <Mail size={13} style={{ verticalAlign: 'text-bottom' }} /> {unverifiedCount} {unverifiedCount === 1 ? 'account is' : 'accounts are'} awaiting email verification
+            </p>
+          )}
+          {userRows.length === 0 ? (
             <div className="empty-state">
-              <h3>No employer accounts yet</h3>
+              <h3>No accounts yet</h3>
             </div>
           ) : (
             <div className="admin-employers-list">
-              {employers
-                .filter((emp) => {
-                  if (!employerSearch) return true;
-                  const q = employerSearch.toLowerCase();
-                  return emp.company_name.toLowerCase().includes(q) ||
-                    (emp.email && emp.email.toLowerCase().includes(q));
-                })
-                .map((emp) => {
+              {userRows.map(({ userId, emp, au }) => {
+                const verified = au ? !!au.email_confirmed_at : null;
+
+                // Auth-only account — signed up but no employer profile yet.
+                if (!emp) {
+                  const email = au?.email || null;
+                  return (
+                    <div key={userId} className="admin-employer-item admin-employer-pending">
+                      <div className="admin-employer-info">
+                        <div className="ej-app-avatar" style={{ backgroundColor: verified ? '#2d9a46' : '#b45309' }}>
+                          {(email || '?').charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <strong>{email || 'Unknown email'}</strong>
+                          {verified === false && (
+                            <span className="status-badge" style={{ backgroundColor: 'rgba(245,158,11,0.12)', color: '#b45309', marginLeft: '0.5rem', fontSize: '0.7rem' }}>
+                              <Mail size={10} /> Awaiting verification
+                            </span>
+                          )}
+                          {verified === true && (
+                            <span className="status-badge" style={{ backgroundColor: 'rgba(56,182,83,0.1)', color: '#2d9a46', marginLeft: '0.5rem', fontSize: '0.7rem' }}>
+                              <Check size={10} /> Verified
+                            </span>
+                          )}
+                          <span className="ej-app-email">
+                            {au?.created_at && <>Signed up {new Date(au.created_at).toLocaleDateString()} · </>}
+                            No profile yet
+                          </span>
+                        </div>
+                      </div>
+                      <div className="admin-employer-actions">
+                        <button className="btn btn-sm btn-danger" onClick={() => deleteAuthUser(userId)}>
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+
                 const color = AVATAR_COLORS[emp.company_name.charCodeAt(0) % AVATAR_COLORS.length];
-                const au = authByUserId.get(emp.user_id);
-                const emailVerified = au ? !!au.email_confirmed_at : null;
+                const emailVerified = verified;
                 return (
-                  <div key={emp.id} className={`admin-employer-item ${!emp.is_approved ? 'admin-employer-pending' : ''}`} style={emp.is_disabled ? { opacity: 0.5 } : {}}>
+                  <div key={userId} className={`admin-employer-item ${!emp.is_approved ? 'admin-employer-pending' : ''}`} style={emp.is_disabled ? { opacity: 0.5 } : {}}>
                     {editingEmployerId === emp.id ? (
                       <div style={{ width: '100%' }}>
                         <div className="form-row">
@@ -635,39 +685,6 @@ export default function AdminPage() {
                   </div>
                 );
               })}
-            </div>
-          )}
-
-          {pendingUsers.length > 0 && (
-            <div style={{ marginTop: '1.5rem' }}>
-              <h3 style={{ fontSize: '0.9rem', color: 'var(--text-muted)', margin: '0 0 0.75rem' }}>
-                Pending email verification ({pendingUsers.length})
-              </h3>
-              <div className="admin-employers-list">
-                {pendingUsers.map((u) => (
-                  <div key={u.id} className="admin-employer-item admin-employer-pending">
-                    <div className="admin-employer-info">
-                      <div className="ej-app-avatar" style={{ backgroundColor: '#b45309' }}>
-                        {(u.email || '?').charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <strong>{u.email || 'Unknown email'}</strong>
-                        <span className="status-badge" style={{ backgroundColor: 'rgba(245,158,11,0.12)', color: '#b45309', marginLeft: '0.5rem', fontSize: '0.7rem' }}>
-                          <Mail size={10} /> Awaiting verification
-                        </span>
-                        <span className="ej-app-email">
-                          Signed up {new Date(u.created_at).toLocaleDateString()} · Hasn't confirmed email
-                        </span>
-                      </div>
-                    </div>
-                    <div className="admin-employer-actions">
-                      <button className="btn btn-sm btn-danger" onClick={() => deleteAuthUser(u.id)}>
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
           )}
         </div>
