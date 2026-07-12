@@ -222,6 +222,35 @@ export default function AdminPage() {
     setAuthUsers((prev) => prev.filter((u) => u.id !== userId));
   }
 
+  // Resend the signup confirmation email. If altEmail is given, the account's
+  // login email is changed to it first (fixes typos), then the link is sent there.
+  async function resendVerification(userId: string, altEmail?: string) {
+    const { data, error } = await supabase.functions.invoke('resend-verification', {
+      body: { userId, altEmail: altEmail ?? null },
+    });
+    const errMsg = error?.message || (data as { error?: string })?.error;
+    if (errMsg) {
+      alert('Failed to resend verification: ' + errMsg);
+      return;
+    }
+    const sentTo = (data as { email?: string }).email;
+    if (altEmail && sentTo) {
+      setAuthUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, email: sentTo } : u)));
+    }
+    alert('Verification email sent to ' + sentTo);
+  }
+
+  function resendVerificationToAlt(userId: string, currentEmail: string | null) {
+    const alt = window.prompt(
+      'Send the verification link to a different email? This changes the account\'s login email to the address you enter.',
+      currentEmail || ''
+    );
+    if (alt === null) return;
+    const trimmed = alt.trim();
+    if (!trimmed) return;
+    resendVerification(userId, trimmed);
+  }
+
   async function addTag() {
     if (!newTagName.trim()) return;
     const { data, error } = await supabase
@@ -525,6 +554,16 @@ export default function AdminPage() {
                         </div>
                       </div>
                       <div className="admin-employer-actions">
+                        {verified === false && (
+                          <>
+                            <button className="btn btn-sm btn-outline" onClick={() => resendVerification(userId)}>
+                              <Mail size={14} /> Resend
+                            </button>
+                            <button className="btn btn-sm btn-outline" onClick={() => resendVerificationToAlt(userId, email)}>
+                              <Pencil size={14} /> Resend to…
+                            </button>
+                          </>
+                        )}
                         <button className="btn btn-sm btn-danger" onClick={() => deleteAuthUser(userId)}>
                           <Trash2 size={14} />
                         </button>
