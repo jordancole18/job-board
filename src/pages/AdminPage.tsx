@@ -174,20 +174,18 @@ export default function AdminPage() {
 
   async function deleteEmployer(employerId: string) {
     if (!confirm('Permanently delete this user and all their job postings, applications, and data? This cannot be undone.')) return;
-    // Delete all related data
     const emp = employers.find((e) => e.id === employerId);
     if (!emp) return;
-    // Get their jobs to clean up related records
-    const { data: jobs } = await supabase.from('jobs').select('id').eq('employer_id', emp.user_id);
-    if (jobs) {
-      for (const job of jobs) {
-        await supabase.from('job_tags').delete().eq('job_id', job.id);
-        await supabase.from('applications').delete().eq('job_id', job.id);
-        await supabase.from('job_views').delete().eq('job_id', job.id);
-      }
-      await supabase.from('jobs').delete().eq('employer_id', emp.user_id);
+    // Deletion runs in an edge function: removing the Supabase Auth user
+    // requires the service role, which the browser can't hold. The function
+    // also cleans up the employer's jobs/applications/data.
+    const { data, error } = await supabase.functions.invoke('delete-account', {
+      body: { userId: emp.user_id },
+    });
+    if (error || (data && (data as { error?: string }).error)) {
+      alert('Failed to delete account: ' + (error?.message || (data as { error?: string }).error));
+      return;
     }
-    await supabase.from('employers').delete().eq('id', employerId);
     setEmployers((prev) => prev.filter((e) => e.id !== employerId));
   }
 
