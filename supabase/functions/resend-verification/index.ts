@@ -61,7 +61,13 @@ Deno.serve(async (req) => {
     if (alt && alt.toLowerCase() !== email.toLowerCase()) {
       const { error: updateErr } = await admin.auth.admin.updateUserById(userId, { email: alt });
       if (updateErr) {
-        return json({ error: `Could not update email: ${updateErr.message}` }, 400);
+        const msg = updateErr.message || "";
+        const alreadyUsed = /duplicate|already|registered|exists/i.test(msg);
+        return json({
+          error: alreadyUsed
+            ? "That email address is already registered to another account."
+            : `Could not update email: ${msg}`,
+        }, 400);
       }
       email = alt;
     }

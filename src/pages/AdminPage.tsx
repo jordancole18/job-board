@@ -191,6 +191,28 @@ export default function AdminPage() {
     setEmployers((prev) => prev.map((e) => e.id === employerId ? { ...e, is_disabled: !currentlyDisabled } : e));
   }
 
+  // supabase.functions.invoke returns a generic "non-2xx status code" message
+  // on 4xx/5xx and hides the function's JSON body (it's on error.context, the
+  // Response). Pull out the real { error } message so admins see the reason.
+  async function invokeError(
+    error: { message?: string; context?: unknown } | null,
+    data: unknown
+  ): Promise<string | null> {
+    const inline = (data as { error?: string } | null)?.error;
+    if (inline) return inline;
+    if (!error) return null;
+    const ctx = error.context as { json?: () => Promise<unknown> } | undefined;
+    if (ctx && typeof ctx.json === 'function') {
+      try {
+        const body = (await ctx.json()) as { error?: string };
+        if (body?.error) return body.error;
+      } catch {
+        /* body wasn't JSON — fall through */
+      }
+    }
+    return error.message || 'Unknown error';
+  }
+
   async function deleteEmployer(employerId: string) {
     if (!confirm('Permanently delete this user and all their job postings, applications, and data? This cannot be undone.')) return;
     const emp = employers.find((e) => e.id === employerId);
@@ -201,8 +223,9 @@ export default function AdminPage() {
     const { data, error } = await supabase.functions.invoke('delete-account', {
       body: { userId: emp.user_id },
     });
-    if (error || (data && (data as { error?: string }).error)) {
-      alert('Failed to delete account: ' + (error?.message || (data as { error?: string }).error));
+    const errMsg = await invokeError(error, data);
+    if (errMsg) {
+      alert('Failed to delete account: ' + errMsg);
       return;
     }
     setEmployers((prev) => prev.filter((e) => e.id !== employerId));
@@ -215,8 +238,9 @@ export default function AdminPage() {
     const { data, error } = await supabase.functions.invoke('delete-account', {
       body: { userId },
     });
-    if (error || (data && (data as { error?: string }).error)) {
-      alert('Failed to delete account: ' + (error?.message || (data as { error?: string }).error));
+    const errMsg = await invokeError(error, data);
+    if (errMsg) {
+      alert('Failed to delete account: ' + errMsg);
       return;
     }
     setAuthUsers((prev) => prev.filter((u) => u.id !== userId));
@@ -228,7 +252,7 @@ export default function AdminPage() {
     const { data, error } = await supabase.functions.invoke('resend-verification', {
       body: { userId, altEmail: altEmail ?? null },
     });
-    const errMsg = error?.message || (data as { error?: string })?.error;
+    const errMsg = await invokeError(error, data);
     if (errMsg) {
       alert('Failed to resend verification: ' + errMsg);
       return;
