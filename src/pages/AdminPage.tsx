@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Tag, FileText, Star, Plus, Trash2, Download, Eye, Pencil, Check, X, Users, ShieldCheck, ShieldX, Crown, Briefcase, Settings, Search, Ban, Mail, ChevronRight, ChevronDown } from 'lucide-react';
+import { Tag, FileText, Star, Plus, Trash2, Download, Eye, Pencil, Check, X, Users, ShieldCheck, ShieldX, Crown, Briefcase, Settings, Search, Ban, Mail, ChevronRight, ChevronDown, Building2, Landmark } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabase';
 import { JOB_TYPE_OPTIONS, ARRANGEMENT_OPTIONS } from '../constants/jobStyles';
 import { US_STATES } from '../constants/usStates';
+import type { EmployerAltName } from '../types';
 
 interface TagItem {
   id: string;
@@ -28,6 +29,7 @@ interface Submission {
 interface AdminJob {
   id: string;
   employer_id: string;
+  alt_name_id: string | null;
   title: string;
   company_name: string;
   description: string;
@@ -75,6 +77,7 @@ interface Employer {
   is_admin: boolean;
   is_approved: boolean;
   is_disabled: boolean;
+  is_state_association: boolean;
   created_at: string;
 }
 
@@ -86,6 +89,12 @@ interface AuthUser {
   last_sign_in_at: string | null;
 }
 
+const ALT_NAME_STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
+  pending: { bg: 'rgba(245,158,11,0.12)', text: '#b45309', label: 'Pending review' },
+  approved: { bg: 'rgba(56,182,83,0.1)', text: '#2d9a46', label: 'Approved' },
+  declined: { bg: 'rgba(239,68,68,0.1)', text: '#dc2626', label: 'Declined' },
+};
+
 const AVATAR_COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316',
   '#eab308', '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6',
@@ -94,7 +103,7 @@ const AVATAR_COLORS = [
 export default function AdminPage() {
   const { user, isAdmin, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'tags' | 'submissions' | 'jobs' | 'employers' | 'settings'>('employers');
+  const [activeTab, setActiveTab] = useState<'tags' | 'submissions' | 'jobs' | 'employers' | 'altNames' | 'settings'>('employers');
 
   // Tags state
   const [tags, setTags] = useState<TagItem[]>([]);
@@ -118,6 +127,9 @@ export default function AdminPage() {
   const [viewCounts, setViewCounts] = useState<Record<string, number>>({});
   const [expandedEmployerId, setExpandedEmployerId] = useState<string | null>(null);
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
+
+  // Local association name requests awaiting review
+  const [altNames, setAltNames] = useState<EmployerAltName[]>([]);
 
   // Employers state
   const [employers, setEmployers] = useState<Employer[]>([]);
@@ -156,6 +168,7 @@ export default function AdminPage() {
     loadJobs();
     loadEngagement();
     loadEmployers();
+    loadAltNames();
     loadAuthUsers();
     loadSettings();
   }, [user, isAdmin, authLoading]);
@@ -206,6 +219,68 @@ export default function AdminPage() {
       .select('*')
       .order('created_at', { ascending: false });
     if (data) setEmployers(data);
+  }
+
+  async function loadAltNames() {
+    const { data } = await supabase
+      .from('employer_alt_names')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (data) setAltNames(data);
+  }
+
+  // Approving flips every job already linked to this name over to it — the
+  // alt_name_status_changed trigger does that in the same statement.
+  async function reviewAltName(id: string, status: 'approved' | 'declined', note?: string) {
+    const { error } = await supabase
+      .from('employer_alt_names')
+      .update({ status, review_note: note ?? null, reviewed_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) {
+      alert('Failed to update name: ' + error.message);
+      return;
+    }
+    setAltNames((prev) => prev.map((an) =>
+      an.id === id ? { ...an, status, review_note: note ?? null, reviewed_at: new Date().toISOString() } : an
+    ));
+    // Linked listings just changed name server-side.
+    loadJobs();
+  }
+
+  function declineAltName(id: string, name: string) {
+    const note = window.prompt(
+      `Decline "${name}"? Optionally give the association a reason (they'll see it on their dashboard).`,
+      ''
+    );
+    if (note === null) return;
+    reviewAltName(id, 'declined', note.trim() || undefined);
+  }
+
+  async function deleteAltName(id: string, name: string) {
+    if (!confirm(`Delete the name request "${name}"? Any listing using it reverts to the association's own name.`)) return;
+    const { error } = await supabase.from('employer_alt_names').delete().eq('id', id);
+    if (error) {
+      alert('Failed to delete: ' + error.message);
+      return;
+    }
+    setAltNames((prev) => prev.filter((an) => an.id !== id));
+    loadJobs();
+  }
+
+  async function toggleStateAssociation(employerId: string, current: boolean) {
+    const action = current
+      ? 'stop this association from requesting local association names'
+      : 'let this association post on behalf of local associations (subject to your approval)';
+    if (!confirm(`Are you sure you want to ${action}?`)) return;
+    const { error } = await supabase
+      .from('employers')
+      .update({ is_state_association: !current })
+      .eq('id', employerId);
+    if (error) {
+      alert('Failed to update: ' + error.message);
+      return;
+    }
+    setEmployers((prev) => prev.map((e) => e.id === employerId ? { ...e, is_state_association: !current } : e));
   }
 
   async function loadAuthUsers() {
@@ -532,6 +607,9 @@ export default function AdminPage() {
 
   const unverifiedCount = userRows.filter((r) => r.au && !r.au.email_confirmed_at).length;
 
+  const pendingAltNames = altNames.filter((an) => an.status === 'pending');
+  const employerById = new Map(employers.map((e) => [e.id, e]));
+
   // Engagement rollups. jobs.employer_id is the auth user id, which is the same
   // key userRows is built on, so postings join straight onto a user row.
   const appsByJobId = new Map<string, AdminApplication[]>();
@@ -593,6 +671,13 @@ export default function AdminPage() {
         >
           <Briefcase size={16} /> Job Postings
           {allJobs.length > 0 && <span className="tab-badge">{allJobs.length}</span>}
+        </button>
+        <button
+          className={`dashboard-tab ${activeTab === 'altNames' ? 'dashboard-tab-active' : ''}`}
+          onClick={() => setActiveTab('altNames')}
+        >
+          <Building2 size={16} /> Association Names
+          {pendingAltNames.length > 0 && <span className="tab-badge">{pendingAltNames.length}</span>}
         </button>
         <button
           className={`dashboard-tab ${activeTab === 'settings' ? 'dashboard-tab-active' : ''}`}
@@ -758,6 +843,11 @@ export default function AdminPage() {
                                 <Ban size={10} /> Disabled
                               </span>
                             )}
+                            {emp.is_state_association && (
+                              <span className="status-badge" style={{ backgroundColor: 'rgba(99,102,241,0.1)', color: '#6366f1', marginLeft: '0.5rem', fontSize: '0.7rem' }}>
+                                <Landmark size={10} /> State Assoc
+                              </span>
+                            )}
                             {emailVerified === false && (
                               <span className="status-badge" style={{ backgroundColor: 'rgba(245,158,11,0.12)', color: '#b45309', marginLeft: '0.5rem', fontSize: '0.7rem' }}>
                                 <Mail size={10} /> Awaiting verification
@@ -810,6 +900,15 @@ export default function AdminPage() {
                             >
                               <Pencil size={14} /> Edit
                             </button>
+                            {!emp.is_admin && (
+                              <button
+                                className={`btn btn-sm ${emp.is_state_association ? 'btn-primary' : 'btn-outline'}`}
+                                onClick={() => toggleStateAssociation(emp.id, emp.is_state_association)}
+                                title="State associations can request to post under a local association's name"
+                              >
+                                <Landmark size={14} /> {emp.is_state_association ? 'State Assoc' : 'Mark State Assoc'}
+                              </button>
+                            )}
                             {!emp.is_admin && (
                               <button
                                 className={`btn btn-sm ${emp.is_approved ? 'btn-outline' : 'btn-primary'}`}
@@ -1202,6 +1301,74 @@ export default function AdminPage() {
                   )}
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Local association name requests */}
+      {activeTab === 'altNames' && (
+        <div className="admin-section">
+          <p className="form-hint" style={{ marginBottom: '1rem' }}>
+            State associations that hire on behalf of a local association request the local name
+            here. Their listings publish under their <em>own</em> association name until you
+            approve, so nothing is blocked waiting on you — approving switches every listing
+            using that name over at once.
+          </p>
+          {altNames.length === 0 ? (
+            <div className="empty-state">
+              <h3>No name requests yet</h3>
+              <p>Mark an association as a <strong>State Assoc</strong> in the Users tab to let them request local association names.</p>
+            </div>
+          ) : (
+            <div className="admin-employers-list">
+              {altNames.map((an) => {
+                const emp = employerById.get(an.employer_id);
+                const linkedJobs = allJobs.filter((j) => j.alt_name_id === an.id);
+                const style = ALT_NAME_STATUS_STYLES[an.status] || ALT_NAME_STATUS_STYLES.pending;
+                return (
+                  <div
+                    key={an.id}
+                    className={`admin-employer-item ${an.status === 'pending' ? 'admin-employer-pending' : ''}`}
+                  >
+                    <div className="admin-employer-info">
+                      <div className="ej-app-avatar" style={{ backgroundColor: style.text }}>
+                        <Building2 size={16} />
+                      </div>
+                      <div>
+                        <strong>{an.name}</strong>
+                        <span className="status-badge" style={{ backgroundColor: style.bg, color: style.text, marginLeft: '0.5rem', fontSize: '0.7rem' }}>
+                          {style.label}
+                        </span>
+                        <span className="ej-app-email">
+                          Requested by {emp?.company_name || 'unknown association'}
+                          {emp?.email && <> · {emp.email}</>}
+                          {' · '}{new Date(an.created_at).toLocaleDateString()}
+                          {' · '}{linkedJobs.length} {linkedJobs.length === 1 ? 'listing' : 'listings'}
+                        </span>
+                        {an.status === 'declined' && an.review_note && (
+                          <span className="ej-app-email">Reason given: {an.review_note}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="admin-employer-actions">
+                      {an.status !== 'approved' && (
+                        <button className="btn btn-sm btn-primary" onClick={() => reviewAltName(an.id, 'approved')}>
+                          <Check size={14} /> Approve
+                        </button>
+                      )}
+                      {an.status !== 'declined' && (
+                        <button className="btn btn-sm btn-outline" onClick={() => declineAltName(an.id, an.name)}>
+                          <X size={14} /> Decline
+                        </button>
+                      )}
+                      <button className="btn btn-sm btn-danger" onClick={() => deleteAltName(an.id, an.name)}>
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

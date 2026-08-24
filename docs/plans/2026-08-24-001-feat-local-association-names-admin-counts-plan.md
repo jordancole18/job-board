@@ -103,7 +103,7 @@ alt name owned by someone else -> raise exception
 - [x] Link the navbar "powered by Paramount Consulting Group" text
 - [x] Link the footer "Powered by Paramount Consulting Group" text
 - [x] `target="_blank"` + `rel="noopener noreferrer"`; keep the existing type scale/colors
-- [ ] Verify: both links open Paramount's site, styling unchanged in light + mobile widths
+- [x] Verify: both links open Paramount's site (DOM-checked `href`/`target`/`rel`), styling unchanged
 
 ### Phase 2 — Admin application counts (read-only slice, end-to-end)
 
@@ -114,25 +114,30 @@ alt name owned by someone else -> raise exception
 - [x] AdminPage Job Postings tab: show resume + view count per posting
 - [x] AdminPage Users tab: per-association aggregate (postings / resumes / views) with a
       drill-down to that association's postings
-- [ ] Verify: counts match the employer's own dashboard for the same jobs
+- [ ] Verify against live data: counts match the employer's own dashboard for the same jobs
+      (needs the migration applied to the Supabase project — see Deploy & Validation below)
 
 ### Phase 3 — Local association names, end-to-end
 
-- [ ] Migration: `employers.is_state_association`
-- [ ] Migration: `employer_alt_names` table + indexes + RLS + grants
-- [ ] Migration: `jobs.alt_name_id` + index
-- [ ] Migration: `my_employer_id()` / `can_request_alt_name()` SECURITY DEFINER helpers
+- [x] Migration: `employers.is_state_association`
+- [x] Migration: `employer_alt_names` table + indexes + RLS + grants
+- [x] Migration: `jobs.alt_name_id` + index
+- [x] Migration: `my_employer_id()` / `can_request_alt_name()` SECURITY DEFINER helpers
       (mirrors the existing `is_admin()` pattern that fixed RLS recursion)
-- [ ] Migration: `jobs_apply_alt_name()` BEFORE trigger + `alt_name_status_changed()` AFTER trigger
-- [ ] Migration: `notify_admin_alt_name()` notification trigger (hardened-trigger pattern)
-- [ ] Edge function `notify-admin-alt-name` + add to the `deploy` script
-- [ ] AuthContext: expose `isStateAssociation`
-- [ ] PostJobPage: "Posting for a local association?" picker (approved names) + inline request form
-- [ ] DashboardPage: "Association Names" card showing each request and its status
-- [ ] AdminPage: `State Assoc` toggle on employer rows
-- [ ] AdminPage: "Association Names" tab — pending queue with Approve / Decline
-- [ ] Verify end-to-end: flag employer -> request name -> job publishes under real name ->
-      approve -> listing swaps to the local name
+- [x] Migration: `jobs_apply_alt_name()` BEFORE trigger + `alt_name_status_changed()` AFTER trigger
+- [x] Migration: `notify_admin_alt_name()` notification trigger (hardened-trigger pattern)
+- [x] Edge function `notify-admin-alt-name` + add to the `deploy` script
+- [x] AuthContext: expose `isStateAssociation`
+- [x] PostJobPage: "Posting for a local association?" picker (approved names) + inline request form
+- [x] DashboardPage: "Association Names" card showing each request and its status
+- [x] AdminPage: `State Assoc` toggle on employer rows
+- [x] AdminPage: "Association Names" tab — pending queue with Approve / Decline
+- [x] Verify the DB behaviour end-to-end via `npm test` (13 behaviour + 10 RLS assertions,
+      replayed against a scratch Postgres): pending publishes under the real name, approval
+      swaps every linked listing, revoke/delete revert, cross-employer name theft blocked,
+      direct `company_name` writes overridden, non-state-associations blocked by RLS
+- [ ] Verify the UI flow against the live project: flag employer -> request name -> job
+      publishes under real name -> approve -> listing swaps (needs the migration applied)
 
 ---
 
@@ -149,3 +154,42 @@ alt name owned by someone else -> raise exception
   copy them to client accounts. Jordan has a test portal login to explore scraping.
 - **Wholesale background checks** ($200/mo API floor). Waiting on user-demand signal.
 - **Job expiration / renewal** — Phase 2+ of the Jun 18 plan, still unshipped. Not reopened here.
+
+---
+
+## Deploy & Validation
+
+Two migrations and one new edge function ship here, so the DB work has to land before
+the UI works:
+
+```bash
+npm run migrate    # applies 20260824000000 + 20260824000001
+npm run deploy     # includes the new notify-admin-alt-name function
+npm test           # replays every migration into a scratch Postgres and asserts behaviour
+```
+
+`npm run deploy` needs the usual SMTP + `FUNCTION_SECRET` env on the function, and the
+notification only sends when `site_settings.approval_notification_email` is set (same as
+every other notification on the board).
+
+**After deploying:**
+
+1. **Turn one association on.** Admin > Users > *Mark State Assoc* on the state association
+   that asked for this. Nothing changes for anyone else — the field defaults to `false`.
+2. **Watch for:** the "Association Names" tab badge (pending requests), and an
+   `Association name approval requested: …` email.
+3. **Healthy signals:** a request appears as *Pending review*; the requester's listing shows
+   their own association name; approving flips the listing to the local name immediately.
+4. **Failure signals:** a listing showing a name that has no approved request behind it
+   (would mean `jobs_apply_alt_name` isn't installed — re-check the migration applied), or a
+   name request that never emails (check `site_settings.approval_notification_email` and the
+   function logs, not the trigger — the trigger is deliberately silent when the vault secrets
+   aren't set).
+5. **Rollback:** the feature is inert with `is_state_association = false` everywhere, so
+   un-flagging the association disables it without a code deploy. Deleting a name request
+   reverts its listings to the association's real name automatically.
+6. **Window / owner:** Jordan, first 24h after Jess flags the first state association.
+
+Admin counts need no configuration — they light up as soon as `20260824000000` applies.
+Confirm one association's resume count against that employer's own dashboard total for the
+same postings.

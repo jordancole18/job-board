@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Briefcase, Users, Eye, ChevronRight, CreditCard, Clock, Mail } from 'lucide-react';
+import { Briefcase, Users, Eye, ChevronRight, CreditCard, Clock, Mail, Building2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabase';
+import type { EmployerAltName } from '../types';
 
 interface Job {
   id: string;
@@ -21,9 +22,16 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }>
   filled: { bg: 'rgba(99,102,241,0.1)', text: '#6366f1', label: 'Filled' },
 };
 
+const ALT_NAME_STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
+  pending: { bg: 'rgba(245,158,11,0.12)', text: '#b45309', label: 'Awaiting approval' },
+  approved: { bg: 'rgba(56,182,83,0.1)', text: '#2d9a46', label: 'Approved' },
+  declined: { bg: 'rgba(239,68,68,0.1)', text: '#dc2626', label: 'Declined' },
+};
+
 export default function DashboardPage() {
-  const { user, companyName, isApproved, loading: authLoading } = useAuth();
+  const { user, companyName, isApproved, isStateAssociation, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const [altNames, setAltNames] = useState<EmployerAltName[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [appCounts, setAppCounts] = useState<Record<string, number>>({});
   const [totalViews, setTotalViews] = useState(0);
@@ -74,6 +82,19 @@ export default function DashboardPage() {
     }
     setLoading(false);
   }
+
+  // isStateAssociation resolves after AuthContext loads the employer row, which
+  // is later than the initial loadData(), so this gets its own effect.
+  useEffect(() => {
+    if (!isStateAssociation) return;
+    supabase
+      .from('employer_alt_names')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        if (data) setAltNames(data);
+      });
+  }, [isStateAssociation]);
 
   async function updateJobStatus(jobId: string, status: string) {
     await supabase.from('jobs').update({ status }).eq('id', jobId);
@@ -138,6 +159,42 @@ export default function DashboardPage() {
           <span className="stat-label">Total Views</span>
         </div>
       </div>
+
+      {isStateAssociation && altNames.length > 0 && (
+        <div className="alt-name-card">
+          <div className="alt-name-card-head">
+            <Building2 size={16} />
+            <h3>Local Association Names</h3>
+          </div>
+          <p className="alt-name-card-hint">
+            Names you've asked to post under on behalf of a local association. Listings publish
+            as <strong>{companyName}</strong> until a name is approved, then switch over
+            automatically.
+          </p>
+          <div className="alt-name-list">
+            {altNames.map((an) => {
+              const style = ALT_NAME_STATUS_STYLES[an.status] || ALT_NAME_STATUS_STYLES.pending;
+              return (
+                <div key={an.id} className="alt-name-row">
+                  <div>
+                    <strong>{an.name}</strong>
+                    <span className="alt-name-meta">
+                      Requested {new Date(an.created_at).toLocaleDateString()}
+                      {an.status === 'declined' && an.review_note && ` · ${an.review_note}`}
+                    </span>
+                  </div>
+                  <span
+                    className="status-badge"
+                    style={{ backgroundColor: style.bg, color: style.text }}
+                  >
+                    {style.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="dashboard-tabs">

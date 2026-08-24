@@ -13,6 +13,20 @@ export interface Employer {
   is_admin: boolean;
   is_approved: boolean;
   is_disabled: boolean;
+  is_state_association: boolean;
+  created_at: string;
+}
+
+// A local association name a state association has asked to post under.
+// Approval is a display swap, not a gate on publishing: linked jobs go live
+// under the state association's own name and switch once approved.
+export interface EmployerAltName {
+  id: string;
+  employer_id: string;
+  name: string;
+  status: 'pending' | 'approved' | 'declined';
+  review_note: string | null;
+  reviewed_at: string | null;
   created_at: string;
 }
 

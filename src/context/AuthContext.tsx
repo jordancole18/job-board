@@ -19,6 +19,7 @@ interface AuthState {
   companyName: string | null;
   isAdmin: boolean;
   isApproved: boolean;
+  isStateAssociation: boolean;
   loading: boolean;
   signUp: (email: string, password: string, fields: SignUpFields) => Promise<string | null>;
   signIn: (email: string, password: string) => Promise<string | null>;
@@ -34,6 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [companyName, setCompanyName] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isApproved, setIsApproved] = useState(false);
+  const [isStateAssociation, setIsStateAssociation] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // Step 1: Listen for auth changes — NEVER make DB calls inside this callback.
@@ -51,6 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setCompanyName(null);
         setIsAdmin(false);
         setIsApproved(false);
+        setIsStateAssociation(false);
       }
     });
 
@@ -76,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setCompanyName(data.company_name ?? null);
       setIsAdmin(data.is_admin ?? false);
       setIsApproved(data.is_approved ?? false);
+      setIsStateAssociation(data.is_state_association ?? false);
     }
   }
 
@@ -211,10 +215,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setCompanyName(null);
     setIsAdmin(false);
     setIsApproved(false);
+    setIsStateAssociation(false);
   }
 
   return (
-    <AuthContext.Provider value={{ session, user, companyName, isAdmin, isApproved, loading, signUp, signIn, signOut, refreshEmployer }}>
+    <AuthContext.Provider value={{ session, user, companyName, isAdmin, isApproved, isStateAssociation, loading, signUp, signIn, signOut, refreshEmployer }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Clock } from 'lucide-react';
+import { ArrowLeft, Clock, Building2, Plus, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabase';
 import { geocodeAddress, normalizeState } from '../utils/geocode';
 import { JOB_TYPE_OPTIONS, ARRANGEMENT_OPTIONS } from '../constants/jobStyles';
 import { US_STATES } from '../constants/usStates';
+import type { EmployerAltName } from '../types';
 
 interface TagOption {
   id: string;
@@ -14,12 +15,19 @@ interface TagOption {
 }
 
 export default function PostJobPage() {
-  const { user, companyName, isAdmin, isApproved, loading: authLoading } = useAuth();
+  const { user, companyName, isAdmin, isApproved, isStateAssociation, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [tags, setTags] = useState<TagOption[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  // Local association names this state association may post under.
+  const [altNames, setAltNames] = useState<EmployerAltName[]>([]);
+  const [altNameId, setAltNameId] = useState('');
+  const [requestingName, setRequestingName] = useState(false);
+  const [newAltName, setNewAltName] = useState('');
+  const [altNameError, setAltNameError] = useState('');
+  const [altNameSaving, setAltNameSaving] = useState(false);
   const [form, setForm] = useState({
     title: '',
     description: '',
@@ -43,6 +51,61 @@ export default function PostJobPage() {
       if (data) setTags(data);
     });
   }, []);
+
+  useEffect(() => {
+    if (!isStateAssociation) return;
+    loadAltNames();
+  }, [isStateAssociation]);
+
+  async function loadAltNames() {
+    const { data } = await supabase
+      .from('employer_alt_names')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (data) setAltNames(data);
+  }
+
+  async function requestAltName() {
+    const trimmed = newAltName.trim();
+    if (!trimmed) return;
+    setAltNameError('');
+    setAltNameSaving(true);
+
+    // employer_id is the employers row id, not the auth user id.
+    const { data: employer } = await supabase
+      .from('employers')
+      .select('id')
+      .eq('user_id', user!.id)
+      .single();
+
+    if (!employer) {
+      setAltNameError('Could not load your association record. Please refresh and try again.');
+      setAltNameSaving(false);
+      return;
+    }
+
+    const { data, error: insertError } = await supabase
+      .from('employer_alt_names')
+      .insert({ employer_id: employer.id, name: trimmed })
+      .select()
+      .single();
+
+    if (insertError) {
+      setAltNameError(
+        insertError.code === '23505'
+          ? 'You have already requested that name.'
+          : insertError.message
+      );
+      setAltNameSaving(false);
+      return;
+    }
+
+    setAltNames((prev) => [data, ...prev]);
+    setAltNameId(data.id);
+    setNewAltName('');
+    setRequestingName(false);
+    setAltNameSaving(false);
+  }
 
   function update(field: string, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -71,9 +134,12 @@ export default function PostJobPage() {
       ? form.companyNameOverride.trim()
       : companyName;
 
+    // company_name is only a proposal — jobs_apply_alt_name() resolves the
+    // published name from the linked request's approval status.
     const { data: jobData, error: insertError } = await supabase.from('jobs').insert({
       employer_id: user!.id,
       company_name: jobCompanyName,
+      alt_name_id: altNameId || null,
       title: form.title,
       description: form.description,
       requirements: form.requirements,
@@ -102,6 +168,8 @@ export default function PostJobPage() {
 
     navigate('/dashboard');
   }
+
+  const selectedAltName = altNames.find((an) => an.id === altNameId) || null;
 
   if (authLoading || !user) return <div className="page"><div className="loading">Loading...</div></div>;
 
@@ -140,6 +208,87 @@ export default function PostJobPage() {
               <label>Company Name</label>
               <input className="input" value={form.companyNameOverride} onChange={(e) => update('companyNameOverride', e.target.value)} placeholder={companyName || 'Leave blank to use your company name'} />
               <p className="form-hint">Admin: enter any company name, or leave blank to use yours.</p>
+            </div>
+          )}
+
+          {isStateAssociation && (
+            <div className="form-group">
+              <label><Building2 size={14} /> Posting for a local association?</label>
+              <p className="form-hint">
+                Leave this as your own association unless you're hiring on behalf of a local
+                association. Names need a one-time approval from Paramount before they appear
+                on the listing.
+              </p>
+              <select
+                className="input"
+                value={altNameId}
+                onChange={(e) => setAltNameId(e.target.value)}
+              >
+                <option value="">{companyName} (your association)</option>
+                {altNames.map((an) => (
+                  <option key={an.id} value={an.id}>
+                    {an.name}
+                    {an.status === 'pending' && ' — awaiting approval'}
+                    {an.status === 'declined' && ' — declined'}
+                  </option>
+                ))}
+              </select>
+
+              {selectedAltName?.status === 'pending' && (
+                <p className="form-hint form-hint-warning">
+                  This name is still awaiting approval, so the listing will publish as
+                  <strong> {companyName}</strong> and switch to <strong>{selectedAltName.name}</strong>
+                  {' '}once it's approved.
+                </p>
+              )}
+              {selectedAltName?.status === 'declined' && (
+                <p className="error-text">
+                  This name was declined
+                  {selectedAltName.review_note ? `: ${selectedAltName.review_note}` : '.'} The
+                  listing will publish as {companyName}.
+                </p>
+              )}
+
+              {requestingName ? (
+                <div className="alt-name-request">
+                  <input
+                    className="input"
+                    value={newAltName}
+                    onChange={(e) => setNewAltName(e.target.value)}
+                    placeholder="e.g. Three Rivers Association of REALTORS"
+                    maxLength={200}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') { e.preventDefault(); requestAltName(); }
+                      if (e.key === 'Escape') { setRequestingName(false); setAltNameError(''); }
+                    }}
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-primary"
+                    onClick={requestAltName}
+                    disabled={!newAltName.trim() || altNameSaving}
+                  >
+                    {altNameSaving ? 'Sending...' : 'Request'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline"
+                    onClick={() => { setRequestingName(false); setAltNameError(''); }}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline alt-name-add-btn"
+                  onClick={() => setRequestingName(true)}
+                >
+                  <Plus size={14} /> Request a local association name
+                </button>
+              )}
+              {altNameError && <p className="error-text">{altNameError}</p>}
             </div>
           )}
 
