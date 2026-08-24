@@ -3500,6 +3500,7 @@ select.input {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   padding: 12px var(--space-md);
   background: var(--surface);
   border: 1px solid var(--border-light);
@@ -3628,6 +3629,157 @@ select.input {
     flex-direction: column;
     text-align: center;
     gap: var(--space-sm);
+  }
+}
+
+/* ===== Admin engagement (postings / resumes / views) ===== */
+.admin-engagement-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-top: 4px;
+}
+
+.admin-engagement-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* A posting that has actually pulled in resumes — the lead signal Paramount
+   scans this list for. */
+.admin-engagement-stat-live {
+  color: #2d9a46;
+  font-weight: 600;
+}
+
+.admin-engagement-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px 2px 4px;
+  font-size: 0.75rem;
+  font-family: var(--font-body);
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.admin-engagement-toggle:hover:not(:disabled) {
+  background: var(--primary-light);
+  color: var(--primary-hover);
+}
+
+.admin-engagement-toggle:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.admin-engagement-panel {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border-light);
+}
+
+.admin-engagement-job {
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.admin-engagement-job-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: 8px 10px;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--radius);
+}
+
+.admin-engagement-job-head:hover {
+  background: rgba(56, 182, 83, 0.04);
+}
+
+.admin-engagement-job-title {
+  font-weight: 600;
+}
+
+.admin-engagement-job-head .text-muted {
+  font-size: 0.78rem;
+}
+
+.admin-engagement-job-head .admin-engagement-stat {
+  margin-left: auto;
+}
+
+.admin-engagement-job-head .admin-engagement-stat + .admin-engagement-stat {
+  margin-left: 0;
+}
+
+.admin-engagement-empty {
+  margin: 0;
+  padding: 0 10px 10px 30px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.admin-engagement-apps {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 10px 10px 30px;
+}
+
+.admin-engagement-app {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  padding: 8px 10px;
+  background: var(--bg);
+  border-radius: var(--radius);
+}
+
+.admin-engagement-app strong {
+  display: block;
+  font-size: 0.86rem;
+}
+
+.admin-engagement-app-files {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+}
+
+.admin-engagement-app-files .file-link {
+  margin-top: 0;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+}
+
+@media (max-width: 768px) {
+  .admin-engagement-job-head .admin-engagement-stat {
+    margin-left: 0;
   }
 }
 

@@ -107,12 +107,12 @@ alt name owned by someone else -> raise exception
 
 ### Phase 2 — Admin application counts (read-only slice, end-to-end)
 
-- [ ] Migration: admin SELECT policies on `applications` and `job_views` (neither exists today)
-- [ ] Migration: admin DELETE policy on `applications` — the admin panel's `deleteJob()` already
+- [x] Migration: admin SELECT policies on `applications` and `job_views` (neither exists today)
+- [x] Migration: admin DELETE policy on `applications` — the admin panel's `deleteJob()` already
       tries to delete them and currently silently affects 0 rows
-- [ ] AdminPage: load application + view counts per job
-- [ ] AdminPage Job Postings tab: show resume + view count per posting
-- [ ] AdminPage Users tab: per-association aggregate (postings / resumes / views) with a
+- [x] AdminPage: load application + view counts per job
+- [x] AdminPage Job Postings tab: show resume + view count per posting
+- [x] AdminPage Users tab: per-association aggregate (postings / resumes / views) with a
       drill-down to that association's postings
 - [ ] Verify: counts match the employer's own dashboard for the same jobs
 

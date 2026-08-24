@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Tag, FileText, Star, Plus, Trash2, Download, Eye, Pencil, Check, X, Users, ShieldCheck, ShieldX, Crown, Briefcase, Settings, Search, Ban, Mail } from 'lucide-react';
+import { Tag, FileText, Star, Plus, Trash2, Download, Eye, Pencil, Check, X, Users, ShieldCheck, ShieldX, Crown, Briefcase, Settings, Search, Ban, Mail, ChevronRight, ChevronDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabase';
 import { JOB_TYPE_OPTIONS, ARRANGEMENT_OPTIONS } from '../constants/jobStyles';
@@ -27,6 +27,7 @@ interface Submission {
 
 interface AdminJob {
   id: string;
+  employer_id: string;
   title: string;
   company_name: string;
   description: string;
@@ -39,6 +40,23 @@ interface AdminJob {
   work_arrangement: string;
   is_featured: boolean;
   status: string;
+  created_at: string;
+}
+
+// Applications across every job. Admins gained SELECT on `applications` and
+// `job_views` in 20260824000000 so Paramount can see which associations are
+// actually pulling in candidates.
+interface AdminApplication {
+  id: string;
+  job_id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string | null;
+  status: string;
+  rating: string;
+  resume_url: string | null;
+  cover_letter_url: string | null;
   created_at: string;
 }
 
@@ -93,6 +111,14 @@ export default function AdminPage() {
   // Featured jobs state
   const [allJobs, setAllJobs] = useState<AdminJob[]>([]);
 
+  // Engagement state — applications and view counts across all jobs, used for
+  // the per-association resume counts in the Users tab and the per-posting
+  // counts in the Job Postings tab.
+  const [applications, setApplications] = useState<AdminApplication[]>([]);
+  const [viewCounts, setViewCounts] = useState<Record<string, number>>({});
+  const [expandedEmployerId, setExpandedEmployerId] = useState<string | null>(null);
+  const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
+
   // Employers state
   const [employers, setEmployers] = useState<Employer[]>([]);
   const [employerSearch, setEmployerSearch] = useState('');
@@ -128,6 +154,7 @@ export default function AdminPage() {
     loadTags();
     loadSubmissions();
     loadJobs();
+    loadEngagement();
     loadEmployers();
     loadAuthUsers();
     loadSettings();
@@ -153,6 +180,24 @@ export default function AdminPage() {
       .select('*')
       .order('created_at', { ascending: false });
     if (data) setAllJobs(data);
+  }
+
+  // One pass over applications + job_views, tallied client-side. At the board's
+  // current scale (tens of employers) this is a couple of small payloads; if it
+  // grows, swap to a SECURITY DEFINER count function.
+  async function loadEngagement() {
+    const { data: appData } = await supabase
+      .from('applications')
+      .select('id, job_id, first_name, last_name, email, phone, status, rating, resume_url, cover_letter_url, created_at')
+      .order('created_at', { ascending: false });
+    if (appData) setApplications(appData);
+
+    const { data: viewData } = await supabase.from('job_views').select('job_id');
+    if (viewData) {
+      const counts: Record<string, number> = {};
+      viewData.forEach((v) => { counts[v.job_id] = (counts[v.job_id] || 0) + 1; });
+      setViewCounts(counts);
+    }
   }
 
   async function loadEmployers() {
@@ -228,8 +273,12 @@ export default function AdminPage() {
       alert('Failed to delete account: ' + errMsg);
       return;
     }
+    const removedJobIds = new Set(allJobs.filter((j) => j.employer_id === emp.user_id).map((j) => j.id));
     setEmployers((prev) => prev.filter((e) => e.id !== employerId));
     setAuthUsers((prev) => prev.filter((u) => u.id !== emp.user_id));
+    setAllJobs((prev) => prev.filter((j) => !removedJobIds.has(j.id)));
+    setApplications((prev) => prev.filter((a) => !removedJobIds.has(a.job_id)));
+    if (expandedEmployerId === emp.user_id) setExpandedEmployerId(null);
   }
 
   // Delete an auth user that has no employer profile yet (e.g. never verified).
@@ -317,6 +366,13 @@ export default function AdminPage() {
     await supabase.from('job_views').delete().eq('job_id', jobId);
     await supabase.from('jobs').delete().eq('id', jobId);
     setAllJobs((prev) => prev.filter((j) => j.id !== jobId));
+    setApplications((prev) => prev.filter((a) => a.job_id !== jobId));
+    setViewCounts((prev) => {
+      const next = { ...prev };
+      delete next[jobId];
+      return next;
+    });
+    if (expandedJobId === jobId) setExpandedJobId(null);
   }
 
 
@@ -476,6 +532,31 @@ export default function AdminPage() {
 
   const unverifiedCount = userRows.filter((r) => r.au && !r.au.email_confirmed_at).length;
 
+  // Engagement rollups. jobs.employer_id is the auth user id, which is the same
+  // key userRows is built on, so postings join straight onto a user row.
+  const appsByJobId = new Map<string, AdminApplication[]>();
+  applications.forEach((a) => {
+    const list = appsByJobId.get(a.job_id);
+    if (list) list.push(a); else appsByJobId.set(a.job_id, [a]);
+  });
+
+  const jobsByUserId = new Map<string, AdminJob[]>();
+  allJobs.forEach((j) => {
+    const list = jobsByUserId.get(j.employer_id);
+    if (list) list.push(j); else jobsByUserId.set(j.employer_id, [j]);
+  });
+
+  function engagementFor(userId: string) {
+    const userJobs = jobsByUserId.get(userId) || [];
+    let resumes = 0;
+    let views = 0;
+    userJobs.forEach((j) => {
+      resumes += appsByJobId.get(j.id)?.length || 0;
+      views += viewCounts[j.id] || 0;
+    });
+    return { jobs: userJobs, postings: userJobs.length, resumes, views };
+  }
+
   return (
     <div className="page">
       <div className="admin-header">
@@ -598,6 +679,7 @@ export default function AdminPage() {
 
                 const color = AVATAR_COLORS[emp.company_name.charCodeAt(0) % AVATAR_COLORS.length];
                 const emailVerified = verified;
+                const eng = engagementFor(emp.user_id);
                 return (
                   <div key={userId} className={`admin-employer-item ${!emp.is_approved ? 'admin-employer-pending' : ''}`} style={emp.is_disabled ? { opacity: 0.5 } : {}}>
                     {editingEmployerId === emp.id ? (
@@ -691,6 +773,27 @@ export default function AdminPage() {
                               Joined {new Date(emp.created_at).toLocaleDateString()}
                               {emp.is_admin && ' · Admin'}
                             </span>
+                            <span className="admin-engagement-row">
+                              <button
+                                type="button"
+                                className="admin-engagement-toggle"
+                                onClick={() => {
+                                  setExpandedEmployerId(expandedEmployerId === userId ? null : userId);
+                                  setExpandedJobId(null);
+                                }}
+                                disabled={eng.postings === 0}
+                                title={eng.postings === 0 ? 'No postings yet' : 'Show postings and resumes'}
+                              >
+                                {expandedEmployerId === userId ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                                <Briefcase size={12} /> {eng.postings} {eng.postings === 1 ? 'posting' : 'postings'}
+                              </button>
+                              <span className={`admin-engagement-stat ${eng.resumes > 0 ? 'admin-engagement-stat-live' : ''}`}>
+                                <FileText size={12} /> {eng.resumes} {eng.resumes === 1 ? 'resume' : 'resumes'}
+                              </span>
+                              <span className="admin-engagement-stat">
+                                <Eye size={12} /> {eng.views} {eng.views === 1 ? 'view' : 'views'}
+                              </span>
+                            </span>
                           </div>
                         </div>
                         {emp.user_id === user!.id ? (
@@ -741,6 +844,68 @@ export default function AdminPage() {
                             >
                               <Trash2 size={14} />
                             </button>
+                          </div>
+                        )}
+                        {expandedEmployerId === userId && (
+                          <div className="admin-engagement-panel">
+                            {eng.jobs.map((job) => {
+                              const jobApps = appsByJobId.get(job.id) || [];
+                              const jobViews = viewCounts[job.id] || 0;
+                              const jobOpen = expandedJobId === job.id;
+                              return (
+                                <div key={job.id} className="admin-engagement-job">
+                                  <button
+                                    type="button"
+                                    className="admin-engagement-job-head"
+                                    onClick={() => setExpandedJobId(jobOpen ? null : job.id)}
+                                  >
+                                    {jobOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                    <span className="admin-engagement-job-title">{job.title}</span>
+                                    <span className="text-muted">
+                                      {job.city}, {job.state} · {job.status} · posted {new Date(job.created_at).toLocaleDateString()}
+                                    </span>
+                                    <span className={`admin-engagement-stat ${jobApps.length > 0 ? 'admin-engagement-stat-live' : ''}`}>
+                                      <FileText size={12} /> {jobApps.length}
+                                    </span>
+                                    <span className="admin-engagement-stat">
+                                      <Eye size={12} /> {jobViews}
+                                    </span>
+                                  </button>
+                                  {jobOpen && (
+                                    jobApps.length === 0 ? (
+                                      <p className="admin-engagement-empty">No resumes submitted to this posting yet.</p>
+                                    ) : (
+                                      <div className="admin-engagement-apps">
+                                        {jobApps.map((a) => (
+                                          <div key={a.id} className="admin-engagement-app">
+                                            <div>
+                                              <strong>{a.first_name} {a.last_name}</strong>
+                                              <span className="ej-app-email">
+                                                {a.email}
+                                                {a.phone && <> · {a.phone}</>}
+                                                {' · '}{new Date(a.created_at).toLocaleDateString()}
+                                              </span>
+                                            </div>
+                                            <div className="admin-engagement-app-files">
+                                              {a.resume_url && (
+                                                <button type="button" className="file-link" onClick={() => downloadFile(a.resume_url!)}>
+                                                  <Download size={13} /> Resume
+                                                </button>
+                                              )}
+                                              {a.cover_letter_url && (
+                                                <button type="button" className="file-link" onClick={() => downloadFile(a.cover_letter_url!)}>
+                                                  <Download size={13} /> Cover Letter
+                                                </button>
+                                              )}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                       </>
@@ -993,6 +1158,14 @@ export default function AdminPage() {
                         <h4>{job.title}</h4>
                         <span className="text-muted">
                           {job.company_name} &middot; {job.city}, {job.state} &middot; {job.work_arrangement} &middot; {job.job_type} &middot; Posted {new Date(job.created_at).toLocaleDateString()}
+                        </span>
+                        <span className="admin-engagement-row">
+                          <span className={`admin-engagement-stat ${(appsByJobId.get(job.id)?.length || 0) > 0 ? 'admin-engagement-stat-live' : ''}`}>
+                            <FileText size={12} /> {appsByJobId.get(job.id)?.length || 0} {(appsByJobId.get(job.id)?.length || 0) === 1 ? 'resume' : 'resumes'}
+                          </span>
+                          <span className="admin-engagement-stat">
+                            <Eye size={12} /> {viewCounts[job.id] || 0} {(viewCounts[job.id] || 0) === 1 ? 'view' : 'views'}
+                          </span>
                         </span>
                       </div>
                       <div className="admin-featured-actions">
