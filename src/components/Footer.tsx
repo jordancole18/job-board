@@ -1,5 +1,6 @@
 import { useLocation } from 'react-router-dom';
 import { Mail } from 'lucide-react';
+import { PARAMOUNT_NAME, PARAMOUNT_URL } from '../constants/branding';
 
 export default function Footer() {
   const { pathname } = useLocation();
@@ -10,13 +11,21 @@ export default function Footer() {
     <footer className="footer">
       <div className="footer-content">
         <span className="footer-copyright">
-          &copy; {new Date().getFullYear()} Paramount Consulting Group. All rights reserved.
+          &copy; {new Date().getFullYear()} {PARAMOUNT_NAME}. All rights reserved.
         </span>
         <a href="mailto:support@associationcareers.realestate" className="footer-support">
           <Mail size={14} /> Contact Support
         </a>
         <span className="footer-powered-by">
-          Powered by <strong>Paramount Consulting Group</strong>
+          Powered by{' '}
+          <a
+            href={PARAMOUNT_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="powered-by-link"
+          >
+            {PARAMOUNT_NAME}
+          </a>
         </span>
       </div>
     </footer>

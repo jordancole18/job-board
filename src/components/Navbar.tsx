@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Briefcase, Shield, Menu, X, ChevronDown, User, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { PARAMOUNT_NAME, PARAMOUNT_URL } from '../constants/branding';
 
 interface NavbarProps {
   onEditProfile?: () => void;
@@ -51,7 +52,15 @@ export default function Navbar({ onEditProfile }: NavbarProps) {
             Association Careers
           </Link>
           <span className="navbar-powered-by">
-            powered by <strong>Paramount Consulting Group</strong>
+            powered by{' '}
+            <a
+              href={PARAMOUNT_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="powered-by-link"
+            >
+              {PARAMOUNT_NAME}
+            </a>
           </span>
         </div>
         <button className="navbar-toggle" onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle menu">

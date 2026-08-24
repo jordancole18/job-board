@@ -2817,9 +2817,20 @@ select.input {
   padding-left: 38px;
 }
 
-.navbar-powered-by strong {
+/* Shared by the navbar + footer "powered by Paramount" marks, both of which
+   link out to Paramount's site. Inherits the surrounding font size so each
+   context keeps its own scale. */
+.powered-by-link {
   color: var(--text-secondary);
   font-weight: 600;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.powered-by-link:hover,
+.powered-by-link:focus-visible {
+  color: var(--primary);
+  text-decoration: underline;
 }
 
 /* ===== Tag Picker ===== */
@@ -3610,11 +3621,6 @@ select.input {
 .footer-powered-by {
   font-size: 0.75rem;
   color: var(--text-muted);
-}
-
-.footer-powered-by strong {
-  color: var(--text-secondary);
-  font-weight: 600;
 }
 
 @media (max-width: 768px) {
