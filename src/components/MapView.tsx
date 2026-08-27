@@ -16,6 +16,15 @@ interface Job {
   lng: number | string | null;
 }
 
+// CARTO's basemap CDN started requiring an API key, which turned every tile into
+// an "API KEY REQUIRED" watermark. Standard OpenStreetMap tiles are keyless and
+// free for our traffic level; override both vars to move to a keyed provider.
+const TILE_URL =
+  import.meta.env.VITE_MAP_TILE_URL || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const TILE_ATTRIBUTION =
+  import.meta.env.VITE_MAP_TILE_ATTRIBUTION ||
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+
 const greenMarkerSvg = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 25 41"><path d="M12.5 0C5.6 0 0 5.6 0 12.5 0 22.2 12.5 41 12.5 41S25 22.2 25 12.5C25 5.6 19.4 0 12.5 0z" fill="#38b653"/><circle cx="12.5" cy="12.5" r="5.5" fill="white"/></svg>`);
 
 const jobIcon = new Icon({
@@ -193,10 +202,7 @@ export default function MapView({ jobs, center = US_CENTER, zoom = 4, bounds = n
   return (
     <MapContainer center={safeCenter} zoom={safeZoom} className="map-container">
       <FlyToHandler center={safeCenter} zoom={safeZoom} bounds={bounds} />
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
-        url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-      />
+      <TileLayer attribution={TILE_ATTRIBUTION} url={TILE_URL} />
       {renderedMarkers}
     </MapContainer>
   );
