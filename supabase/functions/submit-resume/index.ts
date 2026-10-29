@@ -17,6 +17,13 @@ function json(body: unknown, status = 200) {
   });
 }
 
+const ALLOWED_RESUME_TYPES: Record<string, string> = {
+  "application/pdf": "pdf",
+  "application/msword": "doc",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+};
+const MAX_RESUME_BYTES = 5 * 1024 * 1024; // 5 MB
+
 // Trim and cap a free-text field; returns null for blank optional values.
 function clean(value: unknown, max: number): string | null {
   if (typeof value !== "string") return null;
@@ -36,7 +43,12 @@ Deno.serve(async (req) => {
       return json({ error: "Verification unavailable" }, 500);
     }
 
-    const body = await req.json();
+    let body;
+    try {
+      body = await req.json();
+    } catch {
+      return json({ error: "Invalid request" }, 400);
+    }
     const token = typeof body.captchaToken === "string" ? body.captchaToken : "";
     if (!token) {
       return json({ error: "captcha_required" }, 400);
@@ -49,7 +61,12 @@ Deno.serve(async (req) => {
     const verifyRes = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
       method: "POST",
       body: verifyBody,
+      signal: AbortSignal.timeout(5000),
     });
+    if (!verifyRes.ok) {
+      console.error("Turnstile siteverify returned", verifyRes.status);
+      return json({ error: "Verification unavailable" }, 502);
+    }
     const verification = await verifyRes.json();
     if (!verification.success) {
       return json({ error: "captcha_failed" }, 400);
@@ -67,14 +84,40 @@ Deno.serve(async (req) => {
       return json({ error: "Invalid email" }, 400);
     }
 
-    // Uploads are anonymous and land in this prefix; reject anything else so a
-    // caller can't point a submission at another file in the bucket.
-    const resumeUrl = clean(body.resumeUrl, 300);
-    if (resumeUrl && !/^general-submissions\/[A-Za-z0-9-]+\.[a-z0-9]{1,5}$/.test(resumeUrl)) {
-      return json({ error: "Invalid resume path" }, 400);
+    // The resume arrives base64-encoded and is uploaded here, after the CAPTCHA
+    // has passed, so anonymous callers never get direct write access to storage.
+    const resume = body.resume;
+    let resumeBytes: Uint8Array | null = null;
+    let resumeExt = "";
+    if (resume) {
+      resumeExt = ALLOWED_RESUME_TYPES[resume.type] ?? "";
+      if (!resumeExt || typeof resume.data !== "string") {
+        return json({ error: "Only PDF, DOC, and DOCX files are allowed." }, 400);
+      }
+      try {
+        resumeBytes = Uint8Array.from(atob(resume.data), (c) => c.charCodeAt(0));
+      } catch {
+        return json({ error: "Invalid file" }, 400);
+      }
+      if (resumeBytes.length > MAX_RESUME_BYTES) {
+        return json({ error: "File must be under 5 MB." }, 400);
+      }
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    let resumePath: string | null = null;
+    if (resumeBytes) {
+      resumePath = `general-submissions/${crypto.randomUUID()}.${resumeExt}`;
+      const { error: uploadError } = await supabase.storage
+        .from("applications")
+        .upload(resumePath, resumeBytes, { contentType: resume.type });
+      if (uploadError) {
+        console.error("Upload error:", uploadError.message);
+        return json({ error: "Resume upload failed" }, 500);
+      }
+    }
+
     const { error } = await supabase.from("general_submissions").insert({
       first_name: firstName,
       last_name: lastName,
@@ -83,10 +126,12 @@ Deno.serve(async (req) => {
       looking_for: lookingFor,
       timeline: clean(body.timeline, 100),
       preferred_location: preferredLocation,
-      resume_url: resumeUrl,
+      resume_url: resumePath,
     });
     if (error) {
       console.error("Insert error:", error.message);
+      // Don't leave the file behind if the row didn't save.
+      if (resumePath) await supabase.storage.from("applications").remove([resumePath]);
       return json({ error: "Could not save submission" }, 500);
     }
 

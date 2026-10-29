@@ -35,6 +35,7 @@ function loadScript(): Promise<void> {
       script.onload = () => resolve();
       script.onerror = () => {
         scriptPromise = null;
+        script.remove();
         reject(new Error('Failed to load Turnstile'));
       };
       document.head.appendChild(script);
@@ -67,9 +68,9 @@ export default function TurnstileWidget({ onToken, resetKey = 0 }: Props) {
         if (cancelled || !containerRef.current || !window.turnstile) return;
         widgetId = window.turnstile.render(containerRef.current, {
           sitekey: TURNSTILE_SITE_KEY,
-          callback: (token) => onTokenRef.current(token),
-          'expired-callback': () => onTokenRef.current(null),
-          'error-callback': () => onTokenRef.current(null),
+          callback: (token) => { if (!cancelled) onTokenRef.current(token); },
+          'expired-callback': () => { if (!cancelled) onTokenRef.current(null); },
+          'error-callback': () => { if (!cancelled) onTokenRef.current(null); },
         });
       })
       .catch(() => onTokenRef.current(null));

@@ -5,6 +5,15 @@ import { Upload, CheckCircle, FileText } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import TurnstileWidget, { TURNSTILE_SITE_KEY } from '../components/TurnstileWidget';
 
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function SubmitResumePage() {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -42,7 +51,7 @@ export default function SubmitResumePage() {
     ];
     const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
-    let resumePath: string | null = null;
+    let resume: { type: string; data: string } | null = null;
     if (resumeFile) {
       if (!ALLOWED_TYPES.includes(resumeFile.type)) {
         setError('Only PDF, DOC, and DOCX files are allowed.');
@@ -54,16 +63,9 @@ export default function SubmitResumePage() {
         setSubmitting(false);
         return;
       }
-      const ext = resumeFile.name.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'pdf';
-      const filePath = `general-submissions/${crypto.randomUUID()}.${ext}`;
-      const { error: uploadError } = await supabase.storage.from('applications').upload(filePath, resumeFile);
-      if (uploadError) {
-        console.error('Resume upload error:', uploadError.message);
-        setError('Resume upload failed. Please try again.');
-        setSubmitting(false);
-        return;
-      }
-      resumePath = filePath;
+      // The function uploads the file after the CAPTCHA passes, so there's no
+      // direct storage write from the browser.
+      resume = { type: resumeFile.type, data: await fileToBase64(resumeFile) };
     }
 
     const { data, error: submitError } = await supabase.functions.invoke('submit-resume', {
@@ -75,14 +77,27 @@ export default function SubmitResumePage() {
         lookingFor: form.lookingFor,
         timeline: form.timeline || null,
         preferredLocation: form.preferredLocation,
-        resumeUrl: resumePath,
+        resume,
         captchaToken,
       },
     });
 
     if (submitError || !data?.success) {
-      console.error('Submission error:', submitError?.message ?? data?.error);
-      setError('We couldn\'t verify your submission. Please complete the check and try again.');
+      // Non-2xx responses surface as an error whose body holds the function's message.
+      let code = data?.error as string | undefined;
+      const response = (submitError as { context?: Response } | null)?.context;
+      if (!code && response && typeof response.json === 'function') {
+        code = (await response.json().catch(() => null))?.error;
+      }
+      console.error('Submission error:', code ?? submitError?.message);
+      const captchaFailed = code === 'captcha_failed' || code === 'captcha_required';
+      setError(
+        captchaFailed
+          ? 'We couldn\'t verify you\'re human. Please complete the check and try again.'
+          : code && /files? |File /.test(code)
+            ? code
+            : 'Something went wrong. Please try again.'
+      );
       // Turnstile tokens are single-use, so a failed attempt needs a fresh one.
       setCaptchaToken(null);
       setCaptchaResetKey((k) => k + 1);
@@ -258,10 +273,20 @@ export default function SubmitResumePage() {
             </div>
           </div>
 
-          {TURNSTILE_SITE_KEY && (
+          {TURNSTILE_SITE_KEY ? (
             <div className="form-group">
               <TurnstileWidget onToken={setCaptchaToken} resetKey={captchaResetKey} />
+              {!captchaToken && (
+                <p className="file-drop-hint" id="captcha-hint">
+                  Complete the verification above to enable Submit. If it doesn't appear, disable
+                  ad blockers for this page and reload.
+                </p>
+              )}
             </div>
+          ) : (
+            <p className="error-text">
+              Verification is temporarily unavailable. Please try again later or contact support.
+            </p>
           )}
 
           {error && <p className="error-text">{error}</p>}
@@ -270,6 +295,7 @@ export default function SubmitResumePage() {
             type="submit"
             className="btn btn-primary btn-full btn-lg"
             disabled={submitting || !captchaToken}
+            aria-describedby={captchaToken ? undefined : 'captcha-hint'}
           >
             {submitting ? 'Submitting...' : 'Submit'}
           </button>

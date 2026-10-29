@@ -1332,6 +1332,7 @@ export default function AdminPage() {
                           href={`/jobs/${job.id}`}
                           target="_blank"
                           rel="noopener noreferrer"
+                          aria-label={`View posting: ${job.title} (opens in new tab)`}
                         >
                           <ExternalLink size={14} /> View posting
                         </a>
@@ -1339,6 +1340,7 @@ export default function AdminPage() {
                           <button
                             className="btn btn-sm btn-outline"
                             onClick={() => updateJobStatus(job.id, 'inactive')}
+                            aria-label={`Mark ${job.title} inactive`}
                           >
                             <Ban size={14} /> Mark inactive
                           </button>
