@@ -23,6 +23,7 @@ const ALLOWED_RESUME_TYPES: Record<string, string> = {
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
 };
 const MAX_RESUME_BYTES = 5 * 1024 * 1024; // 5 MB
+const MAX_REQUEST_BYTES = Math.ceil((MAX_RESUME_BYTES * 4) / 3) + 64 * 1024;
 
 // Trim and cap a free-text field; returns null for blank optional values.
 function clean(value: unknown, max: number): string | null {
@@ -41,6 +42,12 @@ Deno.serve(async (req) => {
     if (!TURNSTILE_SECRET_KEY) {
       console.error("TURNSTILE_SECRET_KEY not configured");
       return json({ error: "Verification unavailable" }, 500);
+    }
+
+    // Cap the request before buffering it: 5 MB file as base64 plus form fields.
+    const contentLength = Number(req.headers.get("content-length") || 0);
+    if (contentLength > MAX_REQUEST_BYTES) {
+      return json({ error: "File must be under 5 MB." }, 413);
     }
 
     let body;
