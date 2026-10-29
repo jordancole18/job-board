@@ -1,8 +1,18 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Upload, CheckCircle, FileText } from 'lucide-react';
 import { supabase } from '../utils/supabase';
+import { RECAPTCHA_SITE_KEY, loadRecaptcha, getRecaptchaToken } from '../utils/recaptcha';
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function SubmitResumePage() {
   const [submitted, setSubmitted] = useState(false);
@@ -19,6 +29,11 @@ export default function SubmitResumePage() {
     preferredLocation: '',
   });
 
+  // Load Google's script up front so the token request at submit time is fast.
+  useEffect(() => {
+    if (RECAPTCHA_SITE_KEY) loadRecaptcha().catch(() => {});
+  }, []);
+
   function update(field: string, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
@@ -26,6 +41,10 @@ export default function SubmitResumePage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+    if (!RECAPTCHA_SITE_KEY) {
+      setError('Verification is temporarily unavailable. Please try again later or contact support.');
+      return;
+    }
     setSubmitting(true);
 
     const ALLOWED_TYPES = [
@@ -35,7 +54,7 @@ export default function SubmitResumePage() {
     ];
     const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
-    let resumePath: string | null = null;
+    let resume: { type: string; data: string } | null = null;
     if (resumeFile) {
       if (!ALLOWED_TYPES.includes(resumeFile.type)) {
         setError('Only PDF, DOC, and DOCX files are allowed.');
@@ -47,32 +66,57 @@ export default function SubmitResumePage() {
         setSubmitting(false);
         return;
       }
-      const ext = resumeFile.name.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'pdf';
-      const filePath = `general-submissions/${crypto.randomUUID()}.${ext}`;
-      const { error: uploadError } = await supabase.storage.from('applications').upload(filePath, resumeFile);
-      if (uploadError) {
-        console.error('Resume upload error:', uploadError.message);
-        setError('Resume upload failed. Please try again.');
+      // The function uploads the file after the CAPTCHA passes, so there's no
+      // direct storage write from the browser.
+      try {
+        resume = { type: resumeFile.type, data: await fileToBase64(resumeFile) };
+      } catch {
+        setError('We couldn\'t read that file. Please re-select it and try again.');
         setSubmitting(false);
         return;
       }
-      resumePath = filePath;
     }
 
-    const { error: insertError } = await supabase.from('general_submissions').insert({
-      first_name: form.firstName,
-      last_name: form.lastName,
-      email: form.email,
-      phone: form.phone || null,
-      looking_for: form.lookingFor,
-      timeline: form.timeline || null,
-      preferred_location: form.preferredLocation,
-      resume_url: resumePath,
+    // Fetched last: v3 tokens expire after about two minutes.
+    let captchaToken: string;
+    try {
+      captchaToken = await getRecaptchaToken('submit_resume');
+    } catch {
+      setError('We couldn\'t run the verification check. Disable ad blockers for this page, reload and try again.');
+      setSubmitting(false);
+      return;
+    }
+
+    const { data, error: submitError } = await supabase.functions.invoke('submit-resume', {
+      body: {
+        firstName: form.firstName,
+        lastName: form.lastName,
+        email: form.email,
+        phone: form.phone || null,
+        lookingFor: form.lookingFor,
+        timeline: form.timeline || null,
+        preferredLocation: form.preferredLocation,
+        resume,
+        captchaToken,
+      },
     });
 
-    if (insertError) {
-      console.error('Submission insert error:', insertError.message);
-      setError('Something went wrong. Please try again.');
+    if (submitError || !data?.success) {
+      // Non-2xx responses surface as an error whose body holds the function's message.
+      let code = data?.error as string | undefined;
+      const response = (submitError as { context?: Response } | null)?.context;
+      if (!code && response && typeof response.json === 'function') {
+        code = (await response.json().catch(() => null))?.error;
+      }
+      console.error('Submission error:', code ?? submitError?.message);
+      const captchaFailed = code === 'captcha_failed' || code === 'captcha_required';
+      setError(
+        captchaFailed
+          ? 'We couldn\'t verify this submission came from a person. Please try again, or contact support if it keeps happening.'
+          : code && /files? |File /.test(code)
+            ? code
+            : 'Something went wrong. Please try again.'
+      );
       setSubmitting(false);
       return;
     }
@@ -245,7 +289,15 @@ export default function SubmitResumePage() {
             </div>
           </div>
 
-          {error && <p className="error-text">{error}</p>}
+          <p className="file-drop-hint">
+            This form is protected by reCAPTCHA. Google's{' '}
+            <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>{' '}
+            and{' '}
+            <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>{' '}
+            apply.
+          </p>
+
+          {error && <p className="error-text" role="alert">{error}</p>}
 
           <button type="submit" className="btn btn-primary btn-full btn-lg" disabled={submitting}>
             {submitting ? 'Submitting...' : 'Submit'}

@@ -29,3 +29,7 @@ dist-ssr
 # Supabase CLI local temp
 supabase/.temp/
 docs/screenshots/
+
+# sht workflow evidence
+todos/
+docs/validations/
