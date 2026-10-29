@@ -3935,3 +3935,15 @@ select.input {
   font-weight: 500;
   margin-top: var(--space-sm);
 }
+
+.admin-job-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+}
+
+.turnstile-widget {
+  min-height: 65px;
+}

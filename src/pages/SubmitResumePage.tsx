@@ -3,12 +3,15 @@ import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Upload, CheckCircle, FileText } from 'lucide-react';
 import { supabase } from '../utils/supabase';
+import TurnstileWidget, { TURNSTILE_SITE_KEY } from '../components/TurnstileWidget';
 
 export default function SubmitResumePage() {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaResetKey, setCaptchaResetKey] = useState(0);
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -26,6 +29,10 @@ export default function SubmitResumePage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+    if (!captchaToken) {
+      setError('Please complete the verification check.');
+      return;
+    }
     setSubmitting(true);
 
     const ALLOWED_TYPES = [
@@ -59,20 +66,26 @@ export default function SubmitResumePage() {
       resumePath = filePath;
     }
 
-    const { error: insertError } = await supabase.from('general_submissions').insert({
-      first_name: form.firstName,
-      last_name: form.lastName,
-      email: form.email,
-      phone: form.phone || null,
-      looking_for: form.lookingFor,
-      timeline: form.timeline || null,
-      preferred_location: form.preferredLocation,
-      resume_url: resumePath,
+    const { data, error: submitError } = await supabase.functions.invoke('submit-resume', {
+      body: {
+        firstName: form.firstName,
+        lastName: form.lastName,
+        email: form.email,
+        phone: form.phone || null,
+        lookingFor: form.lookingFor,
+        timeline: form.timeline || null,
+        preferredLocation: form.preferredLocation,
+        resumeUrl: resumePath,
+        captchaToken,
+      },
     });
 
-    if (insertError) {
-      console.error('Submission insert error:', insertError.message);
-      setError('Something went wrong. Please try again.');
+    if (submitError || !data?.success) {
+      console.error('Submission error:', submitError?.message ?? data?.error);
+      setError('We couldn\'t verify your submission. Please complete the check and try again.');
+      // Turnstile tokens are single-use, so a failed attempt needs a fresh one.
+      setCaptchaToken(null);
+      setCaptchaResetKey((k) => k + 1);
       setSubmitting(false);
       return;
     }
@@ -245,9 +258,19 @@ export default function SubmitResumePage() {
             </div>
           </div>
 
+          {TURNSTILE_SITE_KEY && (
+            <div className="form-group">
+              <TurnstileWidget onToken={setCaptchaToken} resetKey={captchaResetKey} />
+            </div>
+          )}
+
           {error && <p className="error-text">{error}</p>}
 
-          <button type="submit" className="btn btn-primary btn-full btn-lg" disabled={submitting}>
+          <button
+            type="submit"
+            className="btn btn-primary btn-full btn-lg"
+            disabled={submitting || !captchaToken}
+          >
             {submitting ? 'Submitting...' : 'Submit'}
           </button>
         </form>

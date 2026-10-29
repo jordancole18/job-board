@@ -8,6 +8,7 @@ import type { EmployerAltName } from '../types';
 interface Job {
   id: string;
   title: string;
+  company_name: string;
   city: string;
   state: string;
   job_type: string;
@@ -50,7 +51,7 @@ export default function DashboardPage() {
   async function loadData() {
     const { data: jobData } = await supabase
       .from('jobs')
-      .select('id, title, city, state, job_type, work_arrangement, status, created_at')
+      .select('id, title, company_name, city, state, job_type, work_arrangement, status, created_at')
       .eq('employer_id', user!.id)
       .order('created_at', { ascending: false });
 
@@ -235,6 +236,7 @@ export default function DashboardPage() {
                       <div className="dash-job-left">
                         <h3>{job.title}</h3>
                         <span className="dashboard-job-meta">
+                          {job.company_name} &middot;{' '}
                           {job.city}, {job.state} &middot; {job.work_arrangement} &middot; {job.job_type} &middot; {timeLabel}
                         </span>
                       </div>

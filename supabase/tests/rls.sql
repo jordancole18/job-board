@@ -105,3 +105,45 @@ SET app.uid = '11111111-1111-1111-1111-111111111111';
 SELECT count(*) AS admin_can_query_applications FROM public.applications;
 SELECT count(*) AS admin_can_query_job_views FROM public.job_views;
 RESET ROLE;
+
+\echo '=== R11: nobody can insert general_submissions directly (CAPTCHA is enforced by the submit-resume function) ==='
+DO $$
+DECLARE r text;
+BEGIN
+  FOREACH r IN ARRAY ARRAY['anon', 'authenticated'] LOOP
+    EXECUTE format('SET LOCAL ROLE %I', r);
+    BEGIN
+      INSERT INTO public.general_submissions (first_name, last_name, email) VALUES ('Bot', 'Spam', 'bot@spam.test');
+      RAISE EXCEPTION 'SECURITY FAIL: % inserted a general submission directly', r;
+    EXCEPTION
+      WHEN insufficient_privilege THEN RAISE NOTICE '% correctly denied', r;
+    END;
+    RESET ROLE;
+  END LOOP;
+END $$;
+
+\echo '=== R12: admin can inactivate another account''s job; a different employer cannot ==='
+INSERT INTO public.jobs (employer_id, company_name, title, description, requirements, salary, job_type, city, state, lat, lng)
+VALUES ('22222222-2222-2222-2222-222222222222', 'Ohio REALTORS', 'Filled Role', 'd', 'r', 's', 'full-time', 'Columbus', 'OH', 39.96, -83.0);
+
+SET ROLE authenticated;
+SET app.uid = '33333333-3333-3333-3333-333333333333';
+UPDATE public.jobs SET status = 'inactive' WHERE title = 'Filled Role';
+RESET ROLE;
+DO $$
+BEGIN
+  IF (SELECT status FROM public.jobs WHERE title = 'Filled Role') <> 'active' THEN
+    RAISE EXCEPTION 'SECURITY FAIL: a non-owner employer changed another account''s job';
+  END IF;
+END $$;
+
+SET ROLE authenticated;
+SET app.uid = '11111111-1111-1111-1111-111111111111';
+UPDATE public.jobs SET status = 'inactive' WHERE title = 'Filled Role';
+RESET ROLE;
+DO $$
+BEGIN
+  IF (SELECT status FROM public.jobs WHERE title = 'Filled Role') <> 'inactive' THEN
+    RAISE EXCEPTION 'FAIL: admin could not inactivate another account''s job';
+  END IF;
+END $$;

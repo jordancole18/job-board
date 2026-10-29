@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Tag, FileText, Star, Plus, Trash2, Download, Eye, Pencil, Check, X, Users, ShieldCheck, ShieldX, Crown, Briefcase, Settings, Search, Ban, Mail, ChevronRight, ChevronDown, Building2, Landmark } from 'lucide-react';
+import { Tag, FileText, Star, Plus, Trash2, Download, Eye, Pencil, Check, X, Users, ShieldCheck, ShieldX, Crown, Briefcase, Settings, Search, Ban, Mail, ChevronRight, ChevronDown, Building2, Landmark, ExternalLink } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabase';
 import { JOB_TYPE_OPTIONS, ARRANGEMENT_OPTIONS } from '../constants/jobStyles';
@@ -25,6 +25,11 @@ interface Submission {
   resume_url: string | null;
   created_at: string;
 }
+
+type JobSort = 'newest' | 'oldest' | 'title-asc' | 'title-desc' | 'status-active' | 'status-inactive';
+
+// Status order for the status sorts; anything unexpected sorts last.
+const STATUS_RANK: Record<string, number> = { active: 0, inactive: 1, filled: 2 };
 
 interface AdminJob {
   id: string;
@@ -119,6 +124,7 @@ export default function AdminPage() {
 
   // Featured jobs state
   const [allJobs, setAllJobs] = useState<AdminJob[]>([]);
+  const [jobSort, setJobSort] = useState<JobSort>('newest');
 
   // Engagement state — applications and view counts across all jobs, used for
   // the per-association resume counts in the Users tab and the per-posting
@@ -452,7 +458,13 @@ export default function AdminPage() {
 
 
   async function updateJobStatus(jobId: string, status: string) {
-    await supabase.from('jobs').update({ status }).eq('id', jobId);
+    // RLS can filter an update down to zero rows without raising an error, so
+    // ask for the updated rows back and treat an empty result as a failure.
+    const { data, error } = await supabase.from('jobs').update({ status }).eq('id', jobId).select('id');
+    if (error || !data || data.length === 0) {
+      alert('Failed to update posting status' + (error ? ': ' + error.message : '. You may not have permission.'));
+      return;
+    }
     setAllJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, status } : j));
   }
 
@@ -634,6 +646,26 @@ export default function AdminPage() {
     });
     return { jobs: userJobs, postings: userJobs.length, resumes, views };
   }
+
+  const sortedJobs = [...allJobs].sort((a, b) => {
+    switch (jobSort) {
+      case 'oldest':
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      case 'title-asc':
+        return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' });
+      case 'title-desc':
+        return b.title.localeCompare(a.title, undefined, { sensitivity: 'base' });
+      case 'status-active':
+      case 'status-inactive': {
+        const dir = jobSort === 'status-active' ? 1 : -1;
+        const diff = ((STATUS_RANK[a.status] ?? 99) - (STATUS_RANK[b.status] ?? 99)) * dir;
+        // Newest first within a status group.
+        return diff || new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      }
+      default:
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    }
+  });
 
   return (
     <div className="page">
@@ -1166,8 +1198,25 @@ export default function AdminPage() {
               <h3>No jobs posted yet</h3>
             </div>
           ) : (
+            <>
+            <div className="admin-job-toolbar">
+              <label htmlFor="job-sort">Sort by</label>
+              <select
+                id="job-sort"
+                className="filter-select"
+                value={jobSort}
+                onChange={(e) => setJobSort(e.target.value as JobSort)}
+              >
+                <option value="newest">Date: newest to oldest</option>
+                <option value="oldest">Date: oldest to newest</option>
+                <option value="title-asc">Alphabetical: A to Z</option>
+                <option value="title-desc">Alphabetical: Z to A</option>
+                <option value="status-active">Status: active first</option>
+                <option value="status-inactive">Status: inactive first</option>
+              </select>
+            </div>
             <div className="admin-featured-list">
-              {allJobs.map((job) => (
+              {sortedJobs.map((job) => (
                 <div key={job.id} className={`admin-featured-item ${job.is_featured ? 'admin-featured-active' : ''}`}>
                   {editingJobId === job.id ? (
                     <div style={{ width: '100%' }}>
@@ -1278,6 +1327,22 @@ export default function AdminPage() {
                           <option value="inactive">Inactive</option>
                           <option value="filled">Filled</option>
                         </select>
+                        <a
+                          className="btn btn-sm btn-outline"
+                          href={`/jobs/${job.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <ExternalLink size={14} /> View posting
+                        </a>
+                        {job.status === 'active' && (
+                          <button
+                            className="btn btn-sm btn-outline"
+                            onClick={() => updateJobStatus(job.id, 'inactive')}
+                          >
+                            <Ban size={14} /> Mark inactive
+                          </button>
+                        )}
                         <button
                           className={`btn btn-sm ${job.is_featured ? 'btn-primary' : 'btn-outline'}`}
                           onClick={() => toggleFeatured(job.id, job.is_featured)}
@@ -1302,6 +1367,7 @@ export default function AdminPage() {
                 </div>
               ))}
             </div>
+            </>
           )}
         </div>
       )}
