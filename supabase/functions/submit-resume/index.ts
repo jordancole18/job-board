@@ -49,6 +49,9 @@ Deno.serve(async (req) => {
     } catch {
       return json({ error: "Invalid request" }, 400);
     }
+    if (!body || typeof body !== "object") {
+      return json({ error: "Invalid request" }, 400);
+    }
     const token = typeof body.captchaToken === "string" ? body.captchaToken : "";
     if (!token) {
       return json({ error: "captcha_required" }, 400);
@@ -90,9 +93,13 @@ Deno.serve(async (req) => {
     let resumeBytes: Uint8Array | null = null;
     let resumeExt = "";
     if (resume) {
-      resumeExt = ALLOWED_RESUME_TYPES[resume.type] ?? "";
+      resumeExt = Object.hasOwn(ALLOWED_RESUME_TYPES, resume.type) ? ALLOWED_RESUME_TYPES[resume.type] : "";
       if (!resumeExt || typeof resume.data !== "string") {
         return json({ error: "Only PDF, DOC, and DOCX files are allowed." }, 400);
+      }
+      // Base64 inflates by 4/3; reject oversize payloads before decoding them.
+      if (resume.data.length > Math.ceil((MAX_RESUME_BYTES * 4) / 3) + 4) {
+        return json({ error: "File must be under 5 MB." }, 400);
       }
       try {
         resumeBytes = Uint8Array.from(atob(resume.data), (c) => c.charCodeAt(0));

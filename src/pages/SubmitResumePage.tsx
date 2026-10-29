@@ -65,7 +65,13 @@ export default function SubmitResumePage() {
       }
       // The function uploads the file after the CAPTCHA passes, so there's no
       // direct storage write from the browser.
-      resume = { type: resumeFile.type, data: await fileToBase64(resumeFile) };
+      try {
+        resume = { type: resumeFile.type, data: await fileToBase64(resumeFile) };
+      } catch {
+        setError('We couldn\'t read that file. Please re-select it and try again.');
+        setSubmitting(false);
+        return;
+      }
     }
 
     const { data, error: submitError } = await supabase.functions.invoke('submit-resume', {
@@ -284,12 +290,12 @@ export default function SubmitResumePage() {
               )}
             </div>
           ) : (
-            <p className="error-text">
+            <p className="error-text" role="alert">
               Verification is temporarily unavailable. Please try again later or contact support.
             </p>
           )}
 
-          {error && <p className="error-text">{error}</p>}
+          {error && <p className="error-text" role="alert">{error}</p>}
 
           <button
             type="submit"
