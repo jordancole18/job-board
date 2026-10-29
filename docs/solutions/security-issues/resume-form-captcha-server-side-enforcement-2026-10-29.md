@@ -10,7 +10,7 @@ symptoms:
 root_cause: missing_validation
 resolution_type: code_fix
 severity: medium
-tags: [captcha, turnstile, edge-function, rls, supabase, storage]
+tags: [captcha, recaptcha-v3, edge-function, rls, supabase, storage]
 ---
 
 # Troubleshooting: CAPTCHA on a Supabase form that writes directly from the browser
@@ -36,16 +36,16 @@ The "Become a Candidate" resume form had no proof that a human was submitting it
 ## Solution
 Move the whole write path behind one verified server step.
 
-- `submit-resume` edge function, in order: fail closed if `TURNSTILE_SECRET_KEY` is missing; reject oversized requests by `Content-Length` before buffering; verify the Turnstile token (5 s timeout, non-OK status rejected); validate fields; check the base64 length before decoding; accept only PDF/DOC/DOCX by MIME and derive the extension server-side; upload with the service role; insert the row; remove the uploaded file if the insert fails.
+- `submit-resume` edge function, in order: fail closed if `RECAPTCHA_SECRET_KEY` is missing; reject oversized requests by `Content-Length` before buffering; verify the reCAPTCHA v3 token with Google (5 s timeout, non-OK status rejected; require success, action `submit_resume` and score >= 0.5); validate fields; check the base64 length before decoding; accept only PDF/DOC/DOCX by MIME and derive the extension server-side; upload with the service role; insert the row; remove the uploaded file if the insert fails.
 - Migration `20261029000000_resume_submit_via_function.sql`: drop the anon insert policy, `REVOKE INSERT` on `general_submissions` from `anon, authenticated`, and recreate the storage upload policy without the `general-submissions/` prefix.
-- Client: `TurnstileWidget` (explicit render, script loaded once), file sent base64 in the function call, button disabled until a token exists, widget remounted after any failure (tokens are single-use), CAPTCHA errors distinguished from other errors, explicit message when the site key is missing or the script is blocked.
+- Client: `src/utils/recaptcha.ts` (script loaded once, token requested at submit time because v3 tokens expire in ~2 minutes), file sent base64 in the function call, CAPTCHA errors distinguished from other errors, explicit message when the site key is missing or the script is blocked. v3 is invisible, so the form shows Google's required privacy/terms notice instead of a widget.
 - Admin: `updateJobStatus` now calls `.update(...).select('id')` and treats an empty result as a permission failure.
 
 ## Verification
 - `npm run build` passes; `eslint` reports the same 30 problems as `main` (no new ones).
 - `npm test` (scratch Postgres replaying all migrations) passes, including new R11 (anon and authenticated cannot insert `general_submissions`) and R12 (an admin can inactivate another account's job; a non-owner employer cannot).
 - Three independent review passes (security, React, data integrity, test quality, Node); no P1 and no open P2 at the end.
-- **Not verified:** the edge function was never executed (no Deno test, no deployed smoke test), and the Turnstile widget was not exercised in a browser. Confirm both after deploy.
+- **Not verified:** the edge function was never executed (no Deno test, no deployed smoke test), and the reCAPTCHA flow was not exercised in a browser. Confirm both after deploy.
 
 ## Why This Works
 The root cause was that the only enforcement point was the browser, while the database and storage accepted anonymous writes. With writes limited to the service role, the function is the only way in, and it checks the token before touching anything. Revoking the direct grants and the storage policy is what makes the CAPTCHA non-bypassable; the widget alone would not.
@@ -56,8 +56,8 @@ The root cause was that the only enforcement point was the browser, while the da
 - Supabase `update` with RLS returns no error for zero affected rows; request the rows back and check the count.
 
 ## Deploy order and prerequisites
-1. Set `TURNSTILE_SECRET_KEY` and deploy the function with `--no-verify-jwt` (`npm run deploy` does this).
-2. Set `VITE_TURNSTILE_SITE_KEY` at build time and deploy the frontend.
+1. Set `RECAPTCHA_SECRET_KEY` and deploy the function with `--no-verify-jwt` (`npm run deploy` does this).
+2. Set `VITE_RECAPTCHA_SITE_KEY` at build time and deploy the frontend.
 3. Run the migration. Running it any earlier breaks submissions from the old frontend bundle.
 
 ## Open follow-ups

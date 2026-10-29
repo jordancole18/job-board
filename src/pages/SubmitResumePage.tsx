@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Upload, CheckCircle, FileText } from 'lucide-react';
 import { supabase } from '../utils/supabase';
-import TurnstileWidget, { TURNSTILE_SITE_KEY } from '../components/TurnstileWidget';
+import { RECAPTCHA_SITE_KEY, loadRecaptcha, getRecaptchaToken } from '../utils/recaptcha';
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -19,8 +19,6 @@ export default function SubmitResumePage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [resumeFile, setResumeFile] = useState<File | null>(null);
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  const [captchaResetKey, setCaptchaResetKey] = useState(0);
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -31,6 +29,11 @@ export default function SubmitResumePage() {
     preferredLocation: '',
   });
 
+  // Load Google's script up front so the token request at submit time is fast.
+  useEffect(() => {
+    if (RECAPTCHA_SITE_KEY) loadRecaptcha().catch(() => {});
+  }, []);
+
   function update(field: string, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
@@ -38,8 +41,8 @@ export default function SubmitResumePage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
-    if (!captchaToken) {
-      setError('Please complete the verification check.');
+    if (!RECAPTCHA_SITE_KEY) {
+      setError('Verification is temporarily unavailable. Please try again later or contact support.');
       return;
     }
     setSubmitting(true);
@@ -74,6 +77,16 @@ export default function SubmitResumePage() {
       }
     }
 
+    // Fetched last: v3 tokens expire after about two minutes.
+    let captchaToken: string;
+    try {
+      captchaToken = await getRecaptchaToken('submit_resume');
+    } catch {
+      setError('We couldn\'t run the verification check. Disable ad blockers for this page, reload and try again.');
+      setSubmitting(false);
+      return;
+    }
+
     const { data, error: submitError } = await supabase.functions.invoke('submit-resume', {
       body: {
         firstName: form.firstName,
@@ -99,14 +112,11 @@ export default function SubmitResumePage() {
       const captchaFailed = code === 'captcha_failed' || code === 'captcha_required';
       setError(
         captchaFailed
-          ? 'We couldn\'t verify you\'re human. Please complete the check and try again.'
+          ? 'We couldn\'t verify this submission came from a person. Please try again, or contact support if it keeps happening.'
           : code && /files? |File /.test(code)
             ? code
             : 'Something went wrong. Please try again.'
       );
-      // Turnstile tokens are single-use, so a failed attempt needs a fresh one.
-      setCaptchaToken(null);
-      setCaptchaResetKey((k) => k + 1);
       setSubmitting(false);
       return;
     }
@@ -279,30 +289,17 @@ export default function SubmitResumePage() {
             </div>
           </div>
 
-          {TURNSTILE_SITE_KEY ? (
-            <div className="form-group">
-              <TurnstileWidget onToken={setCaptchaToken} resetKey={captchaResetKey} />
-              {!captchaToken && (
-                <p className="file-drop-hint" id="captcha-hint">
-                  Complete the verification above to enable Submit. If it doesn't appear, disable
-                  ad blockers for this page and reload.
-                </p>
-              )}
-            </div>
-          ) : (
-            <p className="error-text" role="alert">
-              Verification is temporarily unavailable. Please try again later or contact support.
-            </p>
-          )}
+          <p className="file-drop-hint">
+            This form is protected by reCAPTCHA. Google's{' '}
+            <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>{' '}
+            and{' '}
+            <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>{' '}
+            apply.
+          </p>
 
           {error && <p className="error-text" role="alert">{error}</p>}
 
-          <button
-            type="submit"
-            className="btn btn-primary btn-full btn-lg"
-            disabled={submitting || !captchaToken}
-            aria-describedby={captchaToken ? undefined : 'captcha-hint'}
-          >
+          <button type="submit" className="btn btn-primary btn-full btn-lg" disabled={submitting}>
             {submitting ? 'Submitting...' : 'Submit'}
           </button>
         </form>

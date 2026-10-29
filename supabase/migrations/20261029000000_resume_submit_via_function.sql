@@ -1,12 +1,12 @@
 -- Resume submissions now go through the `submit-resume` edge function, which
--- verifies a Turnstile CAPTCHA, uploads the resume and inserts the row with the
+-- verifies a reCAPTCHA v3 token, uploads the resume and inserts the row with the
 -- service role. Remove the direct anon/authenticated paths (table INSERT and
 -- storage upload to general-submissions/) so the CAPTCHA can't be bypassed by
 -- calling PostgREST or the storage API directly.
 --
 -- DEPLOY ORDER (each step must be live before the next):
---   1. Deploy the `submit-resume` function and set TURNSTILE_SECRET_KEY.
---   2. Deploy the frontend (with VITE_TURNSTILE_SITE_KEY set).
+--   1. Deploy the `submit-resume` function and set RECAPTCHA_SECRET_KEY.
+--   2. Deploy the frontend (with VITE_RECAPTCHA_SITE_KEY set).
 --   3. Run this migration.
 -- Running it earlier breaks resume submissions for the old frontend bundle.
 --

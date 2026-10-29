@@ -2,7 +2,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const TURNSTILE_SECRET_KEY = Deno.env.get("TURNSTILE_SECRET_KEY");
+const RECAPTCHA_SECRET_KEY = Deno.env.get("RECAPTCHA_SECRET_KEY");
+const RECAPTCHA_ACTION = "submit_resume";
+// v3 scores run 0.0 (bot) to 1.0 (human); Google suggests 0.5 as the default cut-off.
+const RECAPTCHA_MIN_SCORE = 0.5;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -39,8 +42,8 @@ Deno.serve(async (req) => {
 
   try {
     // Fail closed: without a secret we can't tell a person from a bot.
-    if (!TURNSTILE_SECRET_KEY) {
-      console.error("TURNSTILE_SECRET_KEY not configured");
+    if (!RECAPTCHA_SECRET_KEY) {
+      console.error("RECAPTCHA_SECRET_KEY not configured");
       return json({ error: "Verification unavailable" }, 500);
     }
 
@@ -64,21 +67,32 @@ Deno.serve(async (req) => {
       return json({ error: "captcha_required" }, 400);
     }
 
-    const verifyBody = new URLSearchParams({ secret: TURNSTILE_SECRET_KEY, response: token });
-    const remoteIp = req.headers.get("cf-connecting-ip");
-    if (remoteIp) verifyBody.set("remoteip", remoteIp);
+    const verifyBody = new URLSearchParams({ secret: RECAPTCHA_SECRET_KEY, response: token });
+    const remoteIp = req.headers.get("cf-connecting-ip") || req.headers.get("x-forwarded-for");
+    if (remoteIp) verifyBody.set("remoteip", remoteIp.split(",")[0].trim());
 
-    const verifyRes = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+    const verifyRes = await fetch("https://www.google.com/recaptcha/api/siteverify", {
       method: "POST",
       body: verifyBody,
       signal: AbortSignal.timeout(5000),
     });
     if (!verifyRes.ok) {
-      console.error("Turnstile siteverify returned", verifyRes.status);
+      console.error("reCAPTCHA siteverify returned", verifyRes.status);
       return json({ error: "Verification unavailable" }, 502);
     }
     const verification = await verifyRes.json();
-    if (!verification.success) {
+    if (
+      !verification.success ||
+      verification.action !== RECAPTCHA_ACTION ||
+      typeof verification.score !== "number" ||
+      verification.score < RECAPTCHA_MIN_SCORE
+    ) {
+      console.warn("reCAPTCHA rejected", {
+        success: verification.success,
+        action: verification.action,
+        score: verification.score,
+        errors: verification["error-codes"],
+      });
       return json({ error: "captcha_failed" }, 400);
     }
 
